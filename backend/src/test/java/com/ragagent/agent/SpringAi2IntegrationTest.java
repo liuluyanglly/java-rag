@@ -76,21 +76,21 @@ public class SpringAi2IntegrationTest {
     public void testCustomerServiceTool() {
         com.ragagent.agent.tools.CustomerServiceTool tool = new com.ragagent.agent.tools.CustomerServiceTool();
         
-        // 1. 查询有效预订
+        // 1. 查询有效企业工单
         String detail = tool.getBookingDetails(new com.ragagent.agent.tools.CustomerServiceTool.QueryBookingRequest("BK20260901", "张伟"));
         assertNotNull(detail);
         assertTrue(detail.contains("张伟"));
-        assertTrue(detail.contains("CA1832"));
-        System.out.println("预订查询结果: " + detail);
+        assertTrue(detail.contains("SRV-2026-X1"));
+        System.out.println("工单查询结果: " + detail);
 
         // 2. 身份不符校验
         String mismatch = tool.getBookingDetails(new com.ragagent.agent.tools.CustomerServiceTool.QueryBookingRequest("BK20260901", "李雷"));
         assertTrue(mismatch.contains("不匹配"));
 
-        // 3. 退订业务触发
-        String cancel = tool.cancelBooking(new com.ragagent.agent.tools.CustomerServiceTool.CancelBookingRequest("BK20260901", "张伟", "行程变更"));
+        // 3. 工单撤销办理
+        String cancel = tool.cancelBooking(new com.ragagent.agent.tools.CustomerServiceTool.CancelBookingRequest("BK20260901", "张伟", "业务调整"));
         assertTrue(cancel.contains("成功"));
-        System.out.println("退订申请结果: " + cancel);
+        System.out.println("工单撤销结果: " + cancel);
     }
 
     @Test

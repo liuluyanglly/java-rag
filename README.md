@@ -1,80 +1,76 @@
+<div align="center">
+
 # Antigravity Java RAG + Agent 智能体协同平台
 
-基于 **Spring Boot (Java 21 / 虚拟线程)**、**Spring AI 2.0 (BOM)**、**Spring AI Alibaba Graph**、**全栈 PostgreSQL 16 (pgvector + 图谱 + Checkpoint)** 与 **Sa-Token** 打造的企业级知识协同与智能体编排平台。深度融合 **可插拔 MateClaw 架构**、**KnowledgeOps 知识资产体系**、**Agent 5 种模式** 与 **Spring AI 2.0 全链路监控评测体系**，支持 **RAG 逻辑隔离 与 物理隔离 双轨架构**，前端采用 **React 18 + TypeScript + Ant Design X + TailwindCSS**。
+**基于 Spring Boot (Java 21 / 虚拟线程) 与 Spring AI Alibaba 2.0 的企业级知识协同与智能体编排平台**
 
-> 📖 **【学习者必读】**：项目专为深入学习 Spring AI 2.0、企业级 RAG 与 Agent 架构设计打造，详见 **[👉 深入学习路线图与源码导读文档 (docs/LEARNING_PATH.md)](file:///d:/MyDocuments/tools/gitspace/java-rag/docs/LEARNING_PATH.md)**，包含 5 阶渐进学习路径、各阶段核心源码导读与验证用例！
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.5%20%2F%20Java%2021-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Spring AI](https://img.shields.io/badge/Spring%20AI-2.0.0--M1-blue.svg)](https://spring.io/projects/spring-ai)
+[![Spring AI Alibaba](https://img.shields.io/badge/Spring%20AI%20Alibaba-2.0.0--M1-orange.svg)](https://github.com/alibaba/spring-ai-alibaba)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20(pgvector)-blue.svg)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7.0%20(DB%2010)-red.svg)](https://redis.io/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
----
+四维混合检索 | 深度研报合成 | Agent 5种经典模式 | RAG双轨安全隔离 | 实时可观测性与Token核算 | 统一管理控制台
 
-## 🌟 核心技术与业务体系
+[项目简介](#-项目简介) •
+[核心特性](#-核心特性) •
+[架构全景](#-架构全景) •
+[工作流与Agent模式](#-工作流与-agent-模式) •
+[前端说明](#-前端说明) •
+[API 接口一览](#-api-核心接口一览) •
+[快速开始](#-快速开始与验证) •
+[学习导读](#-深入学习指南)
 
-### 1. Spring AI 2.0 实时监控与全栈可观测性 (Observability)
-- **三大支柱原生态支持**：
-  - **Metrics 指标**：深度集成 Micrometer + Prometheus，端到端采集 `spring.ai.chat.client.operation`（调用频次、响应时长、P99 分布）、`gen_ai.client.token.usage`（输入、输出与总计 Token 统计）、`spring.ai.advisor` 与 `spring.ai.vector.store`。
-  - **Tracing 链路追踪**：支持 Micrometer Tracing 与 OpenTelemetry (OTLP) 原生导出，完整记录请求从 ChatClient、Advisor 链、VectorStore 检索到 LLM 调用的每一跳 Span。
-  - **Logging 日志增强**：内置挂载 `SimpleLoggerAdvisor`，调试期端到端审计输入 Prompt 详情、上下文注入与流式 Token 轨迹。
-- **Token 消耗与成本看板**：提供 `/api/ai/metrics/summary` RESTful 接口，实时输出当前服务 Token 消耗统计、延迟分布与 API 调用成本预估。
-
-### 2. Agent 5 种经典架构模式全景实现 (Agentic Patterns)
-对齐大模型应用设计规范，落地企业级 `AgentPatternService`（`/api/agent/patterns/*`）：
-1. **Chain 链式模式**：线性顺序推进（大纲提炼 -> 内容扩展 -> 语言润色 -> Markdown 格式化），前步输出作为后步输入。
-2. **Parallelization 并行化模式**：基于 **Java 21 虚拟线程** 并发调度多个独立专家视角（技术架构、安全合规、财务预算），并通过专用 Aggregator 聚合器输出综合决策报告。
-3. **Routing 路由模式**：基于大模型意图识别，自动将用户请求分流至不同专业处理链路（`KNOWLEDGE_QA` 知识库问答、`CUSTOMER_SERVICE` 航空客服业务工具、`GENERAL_CHAT` 通用模型直出）。
-4. **Orchestrator-Workers 编排器-工作者模式**：编排器 LLM 动态将复杂宏观项目拆解为 2-4 个专业子任务（数据模型、业务逻辑、接口契约），多个工作者并行交付，最后由合成器融合成完整技术方案。
-5. **Evaluator-Optimizer 评估器-优化器循环模式**：生成器输出方案 -> 严格质检专家多维度评分并输出改进意见 -> 若未达标则携带历史反馈闭环重构优化（最多 3 轮），实现交付质量的螺旋式跃升。
-
-### 3. Spring-AI-Agent-Utils 启发的实战扩展组件
-- **`AgentEnvironment` (运行环境自动感知)**：
-  - 自动感知宿主操作系统、当前精确时间（YYYY-MM-DD HH:mm:ss）、Java 版本、当前工作区目录与 JVM 内存状态；
-  - 自动注入 Agent System Prompt，彻底解决大模型在现实世界时空感知混乱与版本幻觉的问题。
-- **`TodoTrackerTool` (结构化任务追踪器)**：
-  - 提供大模型自驱动的待办清单管理工具，支持 `addTask`、`updateTaskStatus`（PENDING / IN_PROGRESS / COMPLETED / FAILED）与 `listTasks`；
-  - 极大提升复杂多步骤 Agent 执行过程的透明度与可解释性。
-
-### 4. 业务场景实战：航空智能客服工具链 (Function Calling)
-- **`CustomerServiceTool` 业务工具集**：
-  - `getBookingDetails`：支持机票预订号查询、旅客姓名一致性核验与航班动态回传；
-  - `cancelBooking`：支持退票规则校验、退改签业务处理与预订状态原子更新；
-- **防幻觉阻断防御机制**：
-  - 当向量知识库未检索到高匹配度事实内容（或相似度低于阈值）时，系统执行空上下文阻断，杜绝大模型随意发挥产生幻觉。
-
-### 5. 模型 RAG 评测与质检中枢 (Evaluation Center)
-- 集成 Spring AI 原生评测器：
-  - **`FactCheckingEvaluator`**：核验大模型回答是否严格基于检索到的知识库上下文（事实性、真实度）；
-  - **`RelevancyEvaluator`**：评估检索到的文档片段与用户提问语义之间的相关性；
-- 提供 `/api/rag/eval` 单次及批量评测端点，支持企业构建全自动化 RAG CI/CD 评测流水线。
-
-### 6. RAG 双轨安全隔离与二阶段检索优化
-- **双轨安全隔离架构**：
-  - **逻辑隔离 (Logical Isolation)**：常规业务文档存储于共享表，通过元数据切片（`dataset_id`, `accessible_roles`, `security_level`）与 Sa-Token 权限动态注入 `FilterExpression` 实现数据隔离。
-  - **物理隔离 (Physical Isolation)**：核心涉密文档存储于独立物理 `SCHEMA` 或独立实例，算力端强制锁定内网私有模型（Ollama / vLLM），严禁高密数据出外网。
-- **二阶段检索与中文增强**：
-  - **`ChineseTokenTextSplitter`**：原生适配中文标点与断句，消除西文分词切片断裂；
-  - **二阶段检索**：粗排扩大召回（TopK=15~30）+ 精排 Cross-Encoder Rerank 重新打分输出。
-
-### 7. Spring AI Alibaba Graph 状态图工作流引擎
-- **多智能体图流转**：基于 `StateGraph`、`Node`、`ConditionalEdge` 驱动多 Agent 协作（大纲规划 -> 四维搜研 -> 反思质检 -> 长文报告合成）。
-- **PostgreSQL Checkpoint 持久化**：工作流每步状态快照实时落入 `graph_checkpoint` 表，断点续跑零丢失。
-- **Human-in-the-Loop (人机协同)**：支持在关键审批节点自动挂起（`SUSPEND`），等待人工干预后再唤醒恢复。
+</div>
 
 ---
 
-## 📁 系统模块与代码全景
+## 📖 项目简介
+
+**Antigravity Java RAG + Agent** 是一个基于 **Spring AI 2.0 (BOM)**、**Spring AI Alibaba Graph** 状态图引擎与 **全栈 PostgreSQL 16 (pgvector + 图谱 + Checkpoint)** 打造的企业级知识协同、深度研究与智能体编排平台。平台深度融合 **可插拔 MateClaw 架构** 与 **KnowledgeOps 知识资产体系**，支持 **RAG 逻辑隔离 与 物理隔离 双轨架构**。
+
+平台提供清晰的 **前台用户交互工作台** 与 **后台统一管理控制台**：
+- **前台工作台 (User Workplace)**：提供沉浸式 AI 对话、会话列表追踪、打字机流式输出、引用切片溯源、深度推理思考链折叠，以及基于 StateGraph 驱动的 **Deep Research 深度研究工坊**（多维研搜、反思自愈与高清 PDF 研报导出）。右上角提供一键直达后台的**管理台入口标志**。
+- **后台管理台 (Admin Console)**：提供 **知识库中枢 (双轨隔离与切片管理)**、**对话记录与审计管理 (全局会话详情回溯与记忆清退)**、**Agent 智能体编排** 与 **RuoYi 风格系统权限管理中心 (用户/角色/菜单)**。
+
+技术上全面对齐 **Spring AI 2.0 原生规范**，深度落地 **Java 21 虚拟线程并发**、**Redis 10 号库滑动窗口记忆**、**Advisor 拦截审计**、**中文断句增强分词**、**二阶段混合检索重排**、**RAG 事实性与相关度评测中心**，并完整落地业界主流的 **Agent 5 种经典架构范式 (Chain / Parallelization / Routing / Orchestrator-Workers / Evaluator-Optimizer)** 与 **Micrometer + Prometheus 全栈实时监控**。
+
+---
+
+## ✨ 核心特性
+
+| 模块 / 特性 | 说明 | 业务与技术价值 |
+| :--- | :--- | :--- |
+| **StateGraph 深度研报工坊** | 基于阿里 Spring AI Graph 状态图工作流（大纲规划 → 全维搜研 → 反思质检 → 自愈重构 → 研报合成）。 | 支持自主拆解课题，多路并发调研与交叉验证，输出带引用溯源的高清研报。 |
+| **Agent 5 种经典架构模式** | 完整实现 Chain 链式、Parallel 并行化、Routing 路由、Orchestrator 编排器、Evaluator 评估优化器。 | 超越简单问答，构建具备动态规划、对抗质检与多专家协同的复合智能体系统。 |
+| **RAG 双轨安全隔离体系** | 支持**逻辑隔离**（FilterExpression 元数据权限下推）与**物理隔离**（独立 SCHEMA + 内网私有模型）。 | 彻底保障企业高密文档资产安全，杜绝核心涉密数据外泄。 |
+| **二阶段检索与中文增强** | 中文优先分块器 (`ChineseTokenTextSplitter`) + 粗排召回 (TopK=15~30) + Cross-Encoder Rerank 精排打分。 | 攻克传统西文分词切断中文语义的痛点，显著提高检索准确率与抗噪能力。 |
+| **模型 RAG 评测与防幻觉中枢** | 集成 Spring AI `FactCheckingEvaluator`（真实性核验）与 `RelevancyEvaluator`（语义相关度评估）。 | 空上下文阻断大模型胡编乱造，支持一键发起自动化问答质检打分。 |
+| **对话记忆持久化 (ChatMemory)** | 基于 Spring AI 2.0 原生 `ChatMemoryRepository` 实现 `RedisChatMemoryRepository`（10号库）。 | 采用滑动窗口 FIFO 淘汰（默认20条）与 7 天 TTL 自动过期，会话状态物理隔离。 |
+| **全栈实时监控与可观测性** | 深度集成 Micrometer + Prometheus，端到端统计 `spring.ai.chat.client.operation` 与 Token 消耗。 | 提供 `/api/ai/metrics/summary` 看板接口，精确到每次调用的延迟、耗时与成本核算。 |
+| **对话记录与审计管理** | 管理后台统一监管全平台历史对话，支持按会话 ID 深入回溯问答、思考链与切片，支持清退短期记忆。 | 满足企业合规审计要求，解决会话散落、无法追溯与不可控风险。 |
+| **环境感知与任务追踪工具** | 借鉴 `Spring-AI-Agent-Utils`，提供 `AgentEnvironment`（时空锚点）与 `TodoTrackerTool`（任务清单）。 | 消除大模型现实时空认知错位，赋能 Agent 多步骤任务自主规划与执行透明度。 |
+| **全栈 PostgreSQL 16 基座** | 单一实例统摄业务关系表、pgvector 向量索引、知识图谱（实体与关系网）与 Graph 检查点。 | 架构极致简洁，无需额外部署 Milvus 或 Neo4j，大幅降低维护成本。 |
+
+---
+
+## 🏗️ 架构全景
 
 ```text
 java-rag/
-├── backend/                               # Spring Boot 3 + Spring AI 2.0 核心后端工程 (108+ 源文件)
-│   ├── pom.xml                            # 声明 Spring AI 2.0 BOM、Actuator、Micrometer、Sa-Token
+├── backend/                               # Spring Boot 3.3.5 / Java 21 核心服务 (Netty WebFlux 8888 端口)
+│   ├── pom.xml                            # 统一引入 Spring AI 2.0 BOM、Actuator、Micrometer、Sa-Token
 │   └── src/main/java/com/ragagent/
-│       ├── RagAgentApplication.java      # 容器启动入口 (开启虚拟线程与自动装配)
-│       ├── agent/                         # 智能体核心层
-│       │   ├── advisor/                   # 对话拦截器 (ReReadingAdvisor 重读增强)
+│       ├── RagAgentApplication.java      # 容器启动入口 (启用虚拟线程、注解驱动装配)
+│       ├── agent/                         # 智能体核心模块
+│       │   ├── advisor/                   # 对话拦截切面 (ReReadingAdvisor 推理强化)
 │       │   ├── config/                    # ChatClientConfig (装配 SimpleLoggerAdvisor 与 Redis 记忆)
 │       │   ├── controller/                # ChatController 对话接口、PromptController 模板管理
-│       │   ├── pattern/                   # Agent 5 种经典模式 (Chain/Parallel/Routing/Orchestrator/EvalOptimizer)
+│       │   ├── pattern/                   # Agent 5 种模式引擎 (Chain / Parallel / Routing / Orchestrator / EvalOptimizer)
 │       │   ├── service/                   # PromptFileService 提示词模板动态渲染服务
-│       │   └── tools/                     # Agent 工具链 (CustomerServiceTool, TodoTrackerTool, AgentEnvironment)
-│       ├── common/                        # 通共组件层
+│       │   └── tools/                     # Agent 工具链 (CustomerServiceTool 业务工单, TodoTrackerTool, AgentEnvironment)
+│       ├── common/                        # 通用基础设施
 │       │   ├── config/                    # ChatMemoryConfig (RedisChatMemoryRepository 10号库滑动窗口)
 │       │   ├── observability/             # 可观测性监控 (AiObservabilityService, AiObservabilityController)
 │       │   └── result/                    # 统一 REST 响应封装 Result<T>
@@ -83,17 +79,63 @@ java-rag/
 │       │   ├── controller/                # RagEvaluationController 评测中心、ResearchController 深度研究
 │       │   └── service/                   # ChineseTokenTextSplitter, RagSearchService (二阶段重排), RagEvaluationService
 │       ├── graph/                         # Spring AI Alibaba Graph 引擎 (StateGraph/Checkpoint/Nodes)
-│       └── system/                        # RBAC 权限体系 (用户/角色/部门/数据权限)
-├── frontend/                              # React 18 + TS + Vite 高科技感工作台
-│   └── src/
-│       ├── pages/chat/                    # 智能对话工作台 (流式打字机 + 引用溯源卡片 + 记忆面板)
-│       ├── pages/research/                # Deep Research 深度研报工作坊 (状态图流转进度展示)
-│       └── pages/dataset/                 # 知识库管理面板 (双轨隔离、文档分块与向量化)
+│       └── system/                        # RuoYi 风格 RBAC 权限管理中心 (用户/角色/部门/数据权限)
+├── frontend/                              # React 18 + TypeScript + Ant Design X + TailwindCSS 高科技感前端
+│   ├── src/
+│   │   ├── layout/
+│   │   │   ├── UserLayout.tsx             # 前台工作台布局 (左侧纯净对话历史与功能导航，右上角管理台入口)
+│   │   │   └── AdminLayout.tsx            # 后台管理台布局 (知识库中枢、对话记录管理、智能体编排、系统权限)
+│   │   └── pages/
+│   │       ├── chat/                      # 智能对话工作台 (流式打字机 + 引用溯源卡片 + 右上角管理台标志)
+│   │       ├── research/                  # Deep Research 深度研报工作坊 (StateGraph 5 节点流转指示 + 高清 PDF 导出)
+│   │       ├── chat-history/              # 对话记录与审计管理 (全局会话监控、问答历史回溯、记忆清理)
+│   │       ├── dataset/                   # 知识库管理中枢 (双轨隔离、文档分块与向量化)
+│   │       ├── agent/                     # 智能体编排控制台
+│   │       └── system/                    # 用户管理、角色权限树、菜单字典
 ├── sql/
-│   └── init.sql                           # PostgreSQL 16 初始化脚本 (含 pgvector 扩展与基础数据)
+│   └── init.sql                           # PostgreSQL 16 初始化脚本 (RBAC + pgvector 扩展 + 图谱 + Checkpoint)
 ├── docker-compose.yml                     # 一键编排 PostgreSQL 16 (pgvector) + Redis 7
+├── start-backend.bat                      # Windows 一键保活极速启动脚本 (端口防冲突 + JDK 21 自适应)
+├── stop-backend.bat                       # Windows 一键安全停止后端脚本
 └── README.md
 ```
+
+---
+
+## 🔄 工作流与 Agent 模式
+
+### 1. StateGraph 深度研究研报合成工作流
+在 `DeepResearchPage` 前端页面中，直观展现 **Spring AI Alibaba Graph** 的状态机执行流转：
+```plain
+┌─────────────┐     ┌────────────────┐     ┌────────────┐     ┌──────────────────┐     ┌────────────┐
+│  PlanNode   │ ──► │ RetrievalNode  │ ──► │ CriticNode │ ──► │ QueryRewriteNode │ ──► │ ReportNode │
+│ 课题大纲拆解 │     │ 四维混合检索   │     │ 反思一致性 │     │ 自愈重构拓搜回路  │     │ 长文研报合成 │
+└─────────────┘     └────────────────┘     └────────────┘     └──────────────────┘     └────────────┘
+                            ▲                                          │
+                            └──────────────────────────────────────────┘
+                                             自愈拓搜回路
+```
+
+### 2. Agent 5 种经典架构范式 (AgentPatternService)
+- **模式一：Chain 链式**：线性顺序流水线（大纲提炼 → 详细扩展 → 语言润色 → Markdown 输出）。
+- **模式二：Parallelization 并行化**：基于 **Java 21 虚拟线程** 并发调度多专家（技术、合规、财务）视角，再通过专用聚合器合成综合研报。
+- **模式三：Routing 智能路由**：大模型分类器识别意图，自动分流至 RAG 知识库问答、企业业务工单工具或通用直出。
+- **模式四：Orchestrator-Workers 编排器-工作者**：编排器 LLM 动态将复杂宏观项目拆解为专业子任务，Worker 并发执行，合成器汇聚最终成果。
+- **模式五：Evaluator-Optimizer 评估器-优化器循环**：生成初稿 → 严格评审专家多维度打分与提出反馈 → 携带反馈闭环优化重构（最多 3 轮），实现质量螺旋跃升。
+
+---
+
+## 🌐 前端说明
+
+前端采用现代前后台解耦的统一 SPA 架构：
+1. **用户工作台 (`/chat`, `/research`)**：
+   - 移除日常侧边栏的一切管理类杂乱按钮，保持左侧专注于会话切换与常用功能；
+   - **右上角醒目管理台标志**：当登录用户具备管理员权限时，右上角常驻高辨识度 `管理台` 快捷入口，一键平滑跳转至控制台。
+2. **管理控制台 (`/admin/*`)**：
+   - **知识库中枢 (`/admin/dataset`)**：逻辑隔离与物理隔离双轨数据集管理、文档解析与切片管理。
+   - **对话记录与审计管理 (`/admin/chat-history`)**：监管全平台会话，右侧抽屉按时间轴回溯对话问答、推理思考过程与切片引用，支持单条删除与记忆清空。
+   - **智能体编排 (`/admin/agent`)**：模型选择、温度参数调整与工具挂载。
+   - **系统权限中心 (`/admin/system/*`)**：用户、角色与菜单字典管理。
 
 ---
 
@@ -101,42 +143,46 @@ java-rag/
 
 | 模块 | 请求方式 | 路径 | 功能描述 |
 | :--- | :--- | :--- | :--- |
-| **可观测性监控** | `GET` | `/api/ai/metrics/summary` | 获取 ChatClient 调用统计、Token 消耗及预估成本 |
+| **可观测性监控** | `GET` | `/api/ai/metrics/summary` | 获取 ChatClient 调用统计、Token 消耗及预估成本看板 |
 | | `GET` | `/actuator/prometheus` | Prometheus 原生指标抓取端点 |
-| **Agent 模式** | `POST` | `/api/agent/patterns/chain` | 模式一：Chain 链式流水线生成 |
-| | `POST` | `/api/agent/patterns/parallel` | 模式二：Parallelization 多专家并行化与聚合研报 |
+| **Agent 模式** | `POST` | `/api/agent/patterns/chain` | 模式一：Chain 链式流水线任务生成 |
+| | `POST` | `/api/agent/patterns/parallel` | 模式二：Parallelization 虚拟线程多专家并发研报合成 |
 | | `POST` | `/api/agent/patterns/routing` | 模式三：Routing 智能意图分类分流 |
 | | `POST` | `/api/agent/patterns/orchestrator` | 模式四：Orchestrator-Workers 动态任务拆分与编排 |
 | | `POST` | `/api/agent/patterns/eval-optimizer` | 模式五：Evaluator-Optimizer 闭环评估优化循环 |
-| **RAG 质检评测** | `POST` | `/api/rag/eval` | 单条 RAG 事实性与相关度核验 |
+| **RAG 质检评测** | `POST` | `/api/rag/eval` | 单条 RAG 事实性（FactChecking）与相关度（Relevancy）核验 |
 | | `POST` | `/api/rag/eval/batch` | 批量 RAG 问答质量综合质检 |
-| **提示词管理** | `GET` | `/api/prompts` | 获取基于文件的提示词模板列表与可用变量 |
+| **提示词管理** | `GET` | `/api/prompts` | 获取基于外部文件的提示词模板列表与可用变量 |
 | | `POST` | `/api/prompts/render` | 根据模板文件与入参动态渲染最终 Prompt |
-| **智能对话** | `POST` | `/api/chat` | 支持 Redis 短期记忆与知识库模式的流式/阻塞对话 |
+| **智能对话** | `POST` | `/api/chat` | 支持 Redis 短期记忆、知识库问答与防幻觉阻断的流式对话 |
 
 ---
 
-## 🚀 极速启动与验证
+## 🚀 快速开始与验证
 
-### 1. 启动基础设施 (PostgreSQL 16 + Redis 7)
+### 1. 启动基础设施
 ```bash
 docker-compose up -d
 ```
+启动 PostgreSQL 16 (内置 pgvector 扩展) 与 Redis 7 (预分配 10 号数据库)。
 
 ### 2. 启动后端服务
-```bash
-cd backend
-mvn spring-boot:run
-```
-- 后端服务监听端口：`8888`
-- OpenAPI 接口文档地址：`http://localhost:8888/doc.html`
+- **Windows 一键极速启动 (推荐)**：
+  直接在根目录双击运行 `start-backend.bat` 脚本（自动清理端口冲突、自适应本地 JDK 21）。
+- **命令行启动**：
+  ```bash
+  cd backend
+  mvn spring-boot:run
+  ```
+- 后端服务端口：`8888`
+- OpenAPI 交互文档：`http://localhost:8888/doc.html`
 - Prometheus 监控端点：`http://localhost:8888/actuator/prometheus`
 
-### 3. 运行自动化测试套件
+### 3. 运行自动化测试验证
 ```bash
 mvn test -Dtest=SpringAi2IntegrationTest
 ```
-*测试覆盖：Redis 对话记忆滑动窗口、ReReadingAdvisor 拦截、提示词模板文件解析、航空客服工具、RAG 事实性核验、环境自动感知、任务追踪器及 Micrometer 指标采集。*
+*验证通过：Redis 短期记忆滑动窗口、ReReading 增强、Prompt 模板解析、企业服务工单工具、RAG 事实性核验、环境自动感知、任务追踪器及 Micrometer 观测指标采集（全部 7 项用例 100% 绿灯）。*
 
 ### 4. 启动前端工作台
 ```bash
@@ -144,5 +190,13 @@ cd frontend
 npm install
 npm run dev
 ```
-- 访问地址：`http://localhost:3000`
+- 前端访问地址：`http://localhost:3000`
 - 默认管理员账号：`admin` / 密码：`admin123`
+
+---
+
+## 📚 深入学习指南
+
+项目专为深入学习 Spring AI 2.0、企业级 RAG 与 Agent 架构设计打造，配有完整的源码导读与设计解析文档：
+- **[👉 深入学习路线图与源码导读 (docs/LEARNING_PATH.md)](file:///d:/MyDocuments/tools/gitspace/java-rag/docs/LEARNING_PATH.md)**
+  包含从基座搭建、会话记忆持久化、RAG 全链路进阶、工具扩展到 Agent 5 种模式的 5 阶学习路径与代码定位指导。

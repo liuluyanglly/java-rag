@@ -255,16 +255,6 @@ export const UserLayout: React.FC = () => {
               <CompassOutlined className="text-sm text-slate-800" />
               {!sidebarCollapsed && <span>深度研究工坊</span>}
             </button>
-
-            {isAdmin && (
-              <button
-                onClick={() => navigate('/admin/dataset')}
-                className="w-full border-0 bg-transparent flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-slate-200/60 text-slate-700 font-semibold transition-colors text-left"
-              >
-                <BookOutlined className="text-sm text-slate-800" />
-                {!sidebarCollapsed && <span>知识库中枢</span>}
-              </button>
-            )}
           </div>
 
           {/* 历史对话列表 (支持对话编号、时间记录、删除对话；弹性自适应 min-h-0) */}

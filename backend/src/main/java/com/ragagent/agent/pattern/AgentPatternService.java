@@ -148,7 +148,7 @@ public class AgentPatternService {
         String executionPath;
 
         if (route.contains("CUSTOMER_SERVICE")) {
-            executionPath = "航空客服业务分支 (Tools 挂载)";
+            executionPath = "企业工单与业务办理分支 (Tools 工具调用)";
             ChatClient toolClient = chatClientBuilder.defaultTools(customerServiceTool).build();
             executionResult = toolClient.prompt(userQuery).call().content();
         } else if (route.contains("KNOWLEDGE_QA")) {

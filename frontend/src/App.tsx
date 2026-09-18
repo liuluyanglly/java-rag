@@ -8,6 +8,7 @@ import { AdminLoginPage } from './pages/login/AdminLoginPage';
 import { ChatPage } from './pages/chat';
 import { DeepResearchPage } from './pages/research';
 import { DatasetPage } from './pages/dataset';
+import { ChatHistoryManagePage } from './pages/chat-history';
 import { AgentPage } from './pages/agent';
 import { UserManagePage } from './pages/system/user';
 import { RoleManagePage } from './pages/system/role';
@@ -101,6 +102,7 @@ export const App: React.FC = () => {
         >
           <Route index element={<Navigate to="/admin/dataset" replace />} />
           <Route path="dataset" element={<DatasetPage />} />
+          <Route path="chat-history" element={<ChatHistoryManagePage />} />
           <Route path="agent" element={<AgentPage />} />
           <Route path="system/user" element={<UserManagePage />} />
           <Route path="system/role" element={<RoleManagePage />} />

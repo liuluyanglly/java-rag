@@ -14,6 +14,7 @@ import {
   MenuUnfoldOutlined,
   ArrowLeftOutlined,
   SafetyCertificateOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
@@ -33,6 +34,11 @@ export const AdminLayout: React.FC = () => {
       key: '/admin/dataset',
       icon: <BookOutlined className="text-emerald-500 text-base" />,
       label: '知识库中枢 (双轨隔离)',
+    },
+    {
+      key: '/admin/chat-history',
+      icon: <MessageOutlined className="text-indigo-500 text-base" />,
+      label: '对话记录与审计管理',
     },
     {
       key: '/admin/agent',
@@ -70,6 +76,7 @@ export const AdminLayout: React.FC = () => {
   const getBreadcrumbs = () => {
     const path = location.pathname;
     if (path.includes('/admin/dataset')) return ['管理控制台', '企业知识库'];
+    if (path.includes('/admin/chat-history')) return ['管理控制台', '对话记录管理'];
     if (path.includes('/admin/agent')) return ['管理控制台', '智能体编排'];
     if (path.includes('/admin/system/user')) return ['管理控制台', '系统权限', '用户管理'];
     if (path.includes('/admin/system/role')) return ['管理控制台', '系统权限', '角色管理'];

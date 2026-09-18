@@ -28,8 +28,9 @@ import {
   RightOutlined,
   BulbOutlined,
   UploadOutlined,
+  DashboardOutlined,
 } from '@ant-design/icons';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   getChatSessionsApi,
   createChatSessionApi,
@@ -94,7 +95,9 @@ const UserAvatarBadge: React.FC<{ char: string }> = ({ char }) => (
 );
 
 export const ChatPage: React.FC = () => {
-  const { userInfo } = useAuthStore();
+  const navigate = useNavigate();
+  const { userInfo, roles } = useAuthStore();
+  const isAdmin = roles?.some((r: any) => r.roleKey === 'admin' || r.roleId === 1) ?? false;
   const userName = userInfo?.nickName || userInfo?.username || '当前用户';
   const userAvatarChar = (userInfo?.nickName?.[0] || userInfo?.username?.[0] || '用').toUpperCase();
 
@@ -412,11 +415,24 @@ export const ChatPage: React.FC = () => {
               okText="清空"
               cancelText="取消"
             >
-              <button className="border-0 bg-transparent flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-500 px-2.5 py-1.5 rounded-lg hover:bg-red-50/60 transition-all">
+              <button className="border-0 bg-transparent flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-500 px-2.5 py-1.5 rounded-lg hover:bg-red-50/60 transition-all cursor-pointer">
                 <ClearOutlined />
                 <span>清空记录</span>
               </button>
             </Popconfirm>
+          )}
+
+          {/* 右上角管理台快捷入口标志 */}
+          {isAdmin && (
+            <Tooltip title="打开管理控制台 (知识库中枢、对话记录管理、系统权限)">
+              <button
+                onClick={() => navigate('/admin/dataset')}
+                className="border border-slate-200/80 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200 text-slate-700 hover:text-indigo-600 font-semibold px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs transition-all cursor-pointer shadow-2xs"
+              >
+                <DashboardOutlined className="text-indigo-600 text-sm" />
+                <span>管理台</span>
+              </button>
+            </Tooltip>
           )}
         </div>
       </div>
