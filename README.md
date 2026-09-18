@@ -2,6 +2,8 @@
 
 基于 **Spring Boot (Java 21 / 虚拟线程)**、**Spring AI 2.0 (BOM)**、**Spring AI Alibaba Graph**、**全栈 PostgreSQL 16 (pgvector + 图谱 + Checkpoint)** 与 **Sa-Token** 打造的企业级知识协同与智能体编排平台。深度融合 **可插拔 MateClaw 架构**、**KnowledgeOps 知识资产体系**、**Agent 5 种模式** 与 **Spring AI 2.0 全链路监控评测体系**，支持 **RAG 逻辑隔离 与 物理隔离 双轨架构**，前端采用 **React 18 + TypeScript + Ant Design X + TailwindCSS**。
 
+> 📖 **【学习者必读】**：项目专为深入学习 Spring AI 2.0、企业级 RAG 与 Agent 架构设计打造，详见 **[👉 深入学习路线图与源码导读文档 (docs/LEARNING_PATH.md)](file:///d:/MyDocuments/tools/gitspace/java-rag/docs/LEARNING_PATH.md)**，包含 5 阶渐进学习路径、各阶段核心源码导读与验证用例！
+
 ---
 
 ## 🌟 核心技术与业务体系

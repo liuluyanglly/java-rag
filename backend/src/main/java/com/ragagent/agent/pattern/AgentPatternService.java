@@ -19,13 +19,32 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Spring AI 2.0 核心 Agent 5 种模式服务实现 (对齐语雀文档 15)
- * 模式覆盖：
- * 1. Chain 链式模式 (线性推进：大纲 -> 展开 -> 优化 -> 格式化)
- * 2. Parallelization 并行化模式 (虚拟线程多专家并发 + 聚合器合成)
- * 3. Routing 路由模式 (意图分类 -> 知识库 / 客服工具 / 通用直出)
- * 4. Orchestrator-Workers 编排器-工作者模式 (LLM 动态任务拆分 -> 并发执行 -> 结果合成)
- * 5. Evaluator-Optimizer 评估器-优化器循环模式 (生成 -> 严格质检 -> 带反馈重写)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 🎓【学习指南：Agent 5 种经典架构范式（Anthropic & Spring AI 2.0 最佳实践）】
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 现代 AI 系统正从简单的 Prompt Engineering 走向 Compound AI Systems（复合智能体系统）。
+ * 本类完整实现了大模型应用最经典的 5 种设计模式：
+ * 
+ * 1. 链式流水线 (Chain Pattern)：
+ *    - 原理：将复杂任务解构为严格前后相继的阶段，前一步的输出作为后一步的确定上下文输入。
+ *    - 适用：大纲提取 -> 内容编写 -> 润色审校 -> Markdown 格式化等流水线。
+ * 
+ * 2. 并行化与聚合 (Parallelization Pattern)：
+ *    - 原理：多路并行调用 LLM，通过多角度/多专家并发思考，再由 Aggregator 汇聚共识与分歧。
+ *    - 核心亮点：借助 Java 21 虚拟线程 (Executors.newVirtualThreadPerTaskExecutor) 消除阻塞等待。
+ * 
+ * 3. 意图路由分流 (Routing Pattern)：
+ *    - 原理：利用小参数高吞吐 LLM 充当“分流网关”，将用户提问精准分派给 RAG、业务 Tools 或直出。
+ *    - 优势：避免单一庞大 System Prompt 带来的注意分散和 Token 浪费。
+ * 
+ * 4. 编排器-工作者 (Orchestrator-Workers Pattern)：
+ *    - 原理：真正的 Agent 动态规划（如 Manus / AutoGPT）——LLM 自主分析宏观任务并拆分子任务，
+ *           各领域 Worker 并发交付，最后由合成器融合成完整技术方案。
+ * 
+ * 5. 评估器-优化器闭环 (Evaluator-Optimizer Pattern)：
+ *    - 原理：生成器 (Generator) 与极度严苛的评审器 (Evaluator) 形成对抗闭环，
+ *           只要未通过质检，便携带评审反馈重构方案（最多迭代 N 轮），实现交付质量的螺旋跃升。
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 @Slf4j
 @Service
@@ -36,9 +55,10 @@ public class AgentPatternService {
     private final RagSearchService ragSearchService;
     private final CustomerServiceTool customerServiceTool;
 
-    // ==========================================
-    // 模式一：Chain 链式 (顺序流水线)
-    // ==========================================
+    // =========================================================================
+    // 💡 模式一：Chain 链式工作流 (顺序流水线，前步输出 -> 后步输入)
+    // 适用场景：长难任务分解为清晰的顺序步骤，用延迟换取高准确度
+    // =========================================================================
 
     public ChainResult runChainPattern(String requirement) {
         ChatClient client = chatClientBuilder.build();
