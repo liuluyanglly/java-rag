@@ -29,8 +29,10 @@ import {
   BulbOutlined,
   UploadOutlined,
   DashboardOutlined,
+  CompassOutlined,
 } from '@ant-design/icons';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { BrandOrbs, DotMatrixBackground } from '@designcodeio/threeui';
 import {
   getChatSessionsApi,
   createChatSessionApi,
@@ -374,21 +376,39 @@ export const ChatPage: React.FC = () => {
 
   const currentAgent = agents.find((a) => a.id === selectedAgentId);
 
-  // 推荐引导卡片
+  // 根据当前 Agent 动态匹配 ThreeUI 3D 品牌球 Variant
+  const getAgentOrbVariant = (name?: string): 'gemini' | 'openai' | 'claude' | 'codex' => {
+    if (!name) return 'gemini';
+    if (name.includes('代码') || name.includes('架构') || name.includes('技术')) return 'codex';
+    if (name.includes('分析') || name.includes('SQL') || name.includes('数据')) return 'openai';
+    if (name.includes('研究') || name.includes('学术') || name.includes('调研')) return 'claude';
+    return 'gemini';
+  };
+
+  // 推荐引导卡片 (高频企业级 RAG 与 Agent 实战场景)
   const quickCards = [
     {
-      icon: <FileSearchOutlined className="text-slate-500 text-sm" />,
-      title: '检索企业核心技术规范',
+      icon: <FileSearchOutlined className="text-indigo-500 text-base" />,
+      title: '知识库混合召回',
+      desc: '多路向量+全文重排序检索技术规范',
       prompt: '请帮我检索知识库中关于系统架构设计与核心技术栈的详细规范要求。',
     },
     {
-      icon: <BarChartOutlined className="text-slate-500 text-sm" />,
-      title: '生成架构方案对比表格',
+      icon: <BarChartOutlined className="text-emerald-500 text-base" />,
+      title: '响应式架构对比',
+      desc: 'WebFlux 与虚拟线程对比分析',
       prompt: '请针对响应式架构与传统阻塞式架构进行全方位对比分析，并输出 Markdown 结构化表格。',
     },
     {
-      icon: <UserOutlined className="text-slate-500 text-sm" />,
-      title: '记住我的代码偏好',
+      icon: <CompassOutlined className="text-amber-500 text-base" />,
+      title: '多 Agent 协同调研',
+      desc: '状态机自动化编排生成深度研报',
+      prompt: '请规划一个多 Agent 协同方案，涵盖规划、信息检索、批判反思与终稿合成全流程。',
+    },
+    {
+      icon: <UserOutlined className="text-purple-500 text-base" />,
+      title: '双轨记忆与反省',
+      desc: '持久化开发习惯与项目上下文',
       prompt: '请记住我的开发偏好：项目严格基于 Spring Boot 4.0.0 与 Netty WebFlux 响应式架构！',
     },
   ];
@@ -435,23 +455,40 @@ export const ChatPage: React.FC = () => {
         </div>
       </div>
 
+      {/* 首屏 3D 点阵背景 (仅在消息为空时以轻量透明度呈现，pointer-events-none 不影响交互) */}
+      {messages.length === 0 && !generating && (
+        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden opacity-20">
+          <DotMatrixBackground opacity={0.35} gridScale={58} speed={0.6} pulseSpeed={0.4} />
+        </div>
+      )}
+
       {/* 中间消息画卷 / 首屏欢迎区 (留足 pb-36 底部内边距，保证与吸底输入框完美重叠而不遮挡内容) */}
-      <div className={`flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-8 md:px-16 pt-6 space-y-6 min-h-0 ${messages.length > 0 ? 'pb-40' : 'pb-6'}`}>
-        {/* 首屏未提问状态 (扣子原汁原味：无黑框，大圆角浅灰卡片，自适应排版) */}
+      <div className={`flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-8 md:px-16 pt-6 space-y-6 min-h-0 relative z-10 ${messages.length > 0 ? 'pb-40' : 'pb-6'}`}>
+        {/* 首屏未提问状态 (ThreeUI 3D 球体 + 极简高质感卡片) */}
         {messages.length === 0 && !generating && (
-          <div className="h-full flex flex-col items-center justify-center -mt-6 max-w-2xl w-full mx-auto">
+          <div className="h-full flex flex-col items-center justify-center -mt-3 max-w-3xl w-full mx-auto">
+            {/* 3D 浮空动态交互核心球 (ThreeUI 原生 WebGL 驱动) */}
+            <div className="relative mb-3 flex flex-col items-center justify-center select-none">
+              <div className="w-20 h-20 flex items-center justify-center transition-transform duration-500 hover:scale-110 cursor-pointer drop-shadow-[0_8px_24px_rgba(99,102,241,0.25)]">
+                <BrandOrbs variant={getAgentOrbVariant(currentAgent?.name)} size="medium" speed={1.1} />
+              </div>
+              <div className="mt-1 text-[10px] font-bold text-slate-400 tracking-wider uppercase">
+                {currentAgent?.name || 'Java-RAG Enterprise Agent'}
+              </div>
+            </div>
+
             {/* 居中大字标题 */}
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-950 mb-8 tracking-tight flex items-center gap-2 text-center">
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-6 tracking-tight flex items-center gap-2 text-center">
               <span>今天想和</span>
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-slate-100 text-slate-900 text-lg md:text-xl font-bold border border-slate-200/60">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100/90 backdrop-blur-md text-slate-900 text-lg md:text-xl font-bold border border-slate-200/80 shadow-xs">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs" />
                 <span>{currentAgent?.name || '智能助手'}</span>
               </span>
-              <span>聊点什么？</span>
+              <span>探讨什么？</span>
             </h1>
 
             {/* 核心输入卡片 (边框清晰明显、轻微阴影、聚焦状态蓝色光晕反馈) */}
-            <div className="w-full rounded-2xl border border-slate-300 bg-white p-3.5 shadow-sm hover:border-slate-400 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+            <div className="w-full rounded-2xl border border-slate-300/90 bg-white/95 backdrop-blur-xl p-3.5 shadow-sm hover:border-indigo-400 focus-within:border-indigo-500 focus-within:ring-3 focus-within:ring-indigo-100/80 transition-all">
               <TextArea
                 ref={inputRef}
                 value={inputMessage}
@@ -544,19 +581,27 @@ export const ChatPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 输入框下方的 3 个灵感推荐卡片 */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full mt-4">
+            {/* 输入框下方的 4 个实战场景推荐卡片 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 w-full mt-4">
               {quickCards.map((card, idx) => (
                 <div
                   key={idx}
                   onClick={() => handleSend(card.prompt)}
-                  className="p-3.5 rounded-2xl border border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-xs cursor-pointer transition-all flex flex-col justify-between group"
+                  className="p-3 rounded-xl border border-slate-200/90 bg-white/80 backdrop-blur-md hover:bg-white hover:border-indigo-300 hover:shadow-md cursor-pointer transition-all flex flex-col justify-between group text-left"
                 >
-                  <div className="mb-2 text-slate-600 group-hover:text-slate-900 transition-colors">
-                    {card.icon}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="p-1.5 rounded-lg bg-slate-50 group-hover:bg-indigo-50 transition-colors">
+                      {card.icon}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono font-bold">0{idx + 1}</span>
                   </div>
-                  <div className="text-xs font-bold text-slate-800 group-hover:text-slate-950 transition-colors line-clamp-1">
-                    {card.title}
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                      {card.title}
+                    </div>
+                    <div className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
+                      {card.desc}
+                    </div>
                   </div>
                 </div>
               ))}

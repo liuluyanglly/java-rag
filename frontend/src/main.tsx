@@ -5,6 +5,7 @@ import zhCN from 'antd/locale/zh_CN';
 import { App } from './App';
 import { useThemeStore } from './store/useThemeStore';
 import './index.css';
+import '@designcodeio/threeui/style.css';
 
 const RootApp: React.FC = () => {
   const { isDark } = useThemeStore();

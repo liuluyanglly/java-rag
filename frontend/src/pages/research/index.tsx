@@ -42,6 +42,7 @@ import {
   ResearchTaskItem,
 } from '../../api/research';
 import { MarkdownRenderer } from '../../components/MarkdownRenderer';
+import { BrandOrbs, DotMatrixBackground } from '@designcodeio/threeui';
 
 const { TextArea } = Input;
 
@@ -899,14 +900,53 @@ export const DeepResearchPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-slate-400">
-            <div className="w-16 h-16 rounded-3xl bg-purple-50 text-purple-600 flex items-center justify-center text-3xl mb-4 shadow-xs">
-              <CompassOutlined />
+          <div className="h-full flex flex-col items-center justify-center text-slate-400 relative overflow-hidden p-6 select-none">
+            {/* 轻量 3D 点阵星空背景 */}
+            <div className="absolute inset-0 pointer-events-none z-0 opacity-25">
+              <DotMatrixBackground opacity={0.35} gridScale={55} speed={0.5} pulseSpeed={0.3} />
             </div>
-            <h3 className="font-bold text-base text-slate-700 mb-1">欢迎来到深度研究工坊</h3>
-            <p className="text-xs text-slate-400 max-w-sm text-center mb-4">
-              基于 Spring AI Alibaba Graph 状态机编排引擎，输入研究课题即可一键触发大纲规划、四维搜研、反思质检与长篇研报生成。
-            </p>
+
+            <div className="relative z-10 flex flex-col items-center max-w-lg text-center">
+              {/* 3D 浮空动态交互核心球 */}
+              <div className="w-24 h-24 flex items-center justify-center transition-transform duration-500 hover:scale-110 cursor-pointer drop-shadow-[0_12px_28px_rgba(147,51,234,0.25)] mb-3">
+                <BrandOrbs variant="claude" size="medium" speed={1.2} />
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-200/70 text-purple-700 text-xs font-bold mb-3 shadow-2xs">
+                <CompassOutlined />
+                <span>Spring AI Alibaba Graph 多智能体研报中枢</span>
+              </div>
+
+              <h3 className="font-extrabold text-xl text-slate-900 mb-2 tracking-tight">
+                欢迎来到深度研究工坊
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed mb-6 max-w-md">
+                输入宏观或深度业务技术课题，由 Planning、Hybrid Searcher、Critic Router 与 Report Synthesis 等自主智能体集群协作流转，自动化生成结构化万字专业研报。
+              </p>
+
+              {/* 热门预设调研课题推荐 */}
+              <div className="w-full space-y-2">
+                <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase mb-1">
+                  推荐调研课题 (点击直接填入)
+                </div>
+                <div className="grid grid-cols-1 gap-2 text-left">
+                  {[
+                    '国内金融行业向量知识库与混合 RAG 落地架构技术对比与选型指南',
+                    'Spring AI Alibaba Graph 与 LangGraph 在多智能体协同流水线中的机制差异剖析',
+                    '基于大模型会话上下文的双轨记忆机制（短期工作记忆与长期自省图谱）实现规范',
+                  ].map((topic, i) => (
+                    <div
+                      key={i}
+                      onClick={() => setTopicInput(topic)}
+                      className="p-2.5 rounded-xl border border-slate-200/80 bg-white/80 backdrop-blur-sm hover:bg-white hover:border-purple-300 hover:shadow-xs cursor-pointer text-xs text-slate-700 hover:text-purple-700 transition-all flex items-center justify-between group"
+                    >
+                      <span className="truncate pr-2">{topic}</span>
+                      <RightOutlined className="text-[10px] text-slate-400 group-hover:text-purple-600 transition-colors shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

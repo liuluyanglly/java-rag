@@ -11,7 +11,9 @@
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
     "@ant-design/x": "^1.0.1",
+    "@designcodeio/threeui": "^1.2.0",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/three": "^0.186.0",
     "antd": "^5.21.4",
     "axios": "^1.7.7",
     "html2pdf.js": "^0.14.0",
@@ -22,6 +24,7 @@
     "react-router-dom": "^6.27.0",
     "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.0",
+    "three": "^0.186.0",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

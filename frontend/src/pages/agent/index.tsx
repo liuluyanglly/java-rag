@@ -28,6 +28,7 @@ import {
   AgentItem,
 } from '../../api/agent';
 import { getAccessibleDatasetsApi, DatasetItem } from '../../api/dataset';
+import { BrandOrbs } from '@designcodeio/threeui';
 
 export const AgentPage: React.FC = () => {
   const [agents, setAgents] = useState<AgentItem[]>([]);
@@ -130,9 +131,9 @@ export const AgentPage: React.FC = () => {
         {agents.map((a) => (
           <Card
             key={a.id}
-            className="border border-slate-200 dark:border-slate-800 hover:shadow-md transition-all rounded-xl"
+            className="border border-slate-200/80 dark:border-slate-800 hover:border-indigo-300 hover:shadow-lg transition-all duration-300 rounded-2xl group overflow-hidden bg-white/90 backdrop-blur-sm"
             actions={[
-              <span key="edit" onClick={() => handleOpenModal(a)} className="text-xs text-indigo-600">
+              <span key="edit" onClick={() => handleOpenModal(a)} className="text-xs text-indigo-600 font-semibold hover:text-indigo-700">
                 <EditOutlined className="mr-1" /> 配置
               </span>,
               <Popconfirm
@@ -140,37 +141,53 @@ export const AgentPage: React.FC = () => {
                 title="确定删除此智能体吗？"
                 onConfirm={() => handleDelete(a.id)}
               >
-                <span className="text-xs text-red-500 hover:text-red-600">
+                <span className="text-xs text-slate-400 hover:text-red-600 transition-colors">
                   <DeleteOutlined className="mr-1" /> 删除
                 </span>
               </Popconfirm>,
             ]}
           >
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xl flex-shrink-0">
-                🤖
+            <div className="flex items-start gap-3.5">
+              {/* 3D 拟态发光悬浮球头像 (ThreeUI 3D WebGL) */}
+              <div className="w-13 h-13 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-xs group-hover:scale-105 group-hover:shadow-indigo-200/50 transition-all">
+                <BrandOrbs
+                  variant={
+                    a.name.includes('代码') || a.name.includes('架构')
+                      ? 'codex'
+                      : a.name.includes('分析') || a.name.includes('SQL')
+                      ? 'openai'
+                      : a.name.includes('研究') || a.name.includes('学术')
+                      ? 'claude'
+                      : 'gemini'
+                  }
+                  size="small"
+                  speed={1.0}
+                />
               </div>
+
               <div className="flex-1 overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 truncate">
+                <div className="flex items-center justify-between gap-1">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-600 transition-colors">
                     {a.name}
                   </h3>
-                  <Tag color="purple">{a.modelName}</Tag>
+                  <Tag color="purple" className="text-[10px] shrink-0 font-bold border-0 bg-purple-50 text-purple-700">
+                    {a.modelName}
+                  </Tag>
                 </div>
-                <p className="text-xs text-slate-400 line-clamp-2 mt-1">
-                  {a.description || '暂无描述'}
+                <p className="text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                  {a.description || '暂无职责描述'}
                 </p>
               </div>
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2 text-xs text-slate-500">
-              <div className="flex items-center justify-between">
-                <span>多样性 (Temp): {a.temperature}</span>
-                <span>Max Tokens: {a.maxTokens}</span>
+              <div className="flex items-center justify-between text-[11px] font-mono">
+                <span>多样性 (Temp): <strong className="text-slate-700">{a.temperature}</strong></span>
+                <span>Max Tokens: <strong className="text-slate-700">{a.maxTokens}</strong></span>
               </div>
-              <div className="flex items-center gap-1 truncate">
-                <ToolOutlined className="text-slate-400" />
-                <span className="truncate">工具: {a.tools || '[]'}</span>
+              <div className="flex items-center gap-1.5 truncate text-[11px] text-slate-400 bg-slate-50 px-2 py-1 rounded-lg">
+                <ToolOutlined className="text-indigo-500 shrink-0" />
+                <span className="truncate font-mono">工具: {a.tools || '[]'}</span>
               </div>
             </div>
           </Card>
