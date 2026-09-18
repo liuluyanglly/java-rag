@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 03-dataset-add-category
+      author: ragagent
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: ai_dataset
+                columnName: category
+      comment: 示例增量变更：知识库表增加 category 业务类别字段，演示每次修改新增 YAML 并在系统启动时自动更新数据库
+      changes:
+        - addColumn:
+            tableName: ai_dataset
+            columns:
+              - column:
+                  name: category
+                  type: VARCHAR(64)
+                  defaultValue: "GENERAL"
+                  remarks: 业务类别分类（GENERAL-综合, TECH-技术, FINANCE-财务, HR-人力）

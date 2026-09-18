@@ -1,0 +1,68 @@
+server:
+  port: 8888
+  shutdown: graceful
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: java-rag-agent-backend
+  lifecycle:
+    timeout-per-shutdown-phase: 3s
+  profiles:
+    active: dev
+  main:
+    allow-bean-definition-overriding: true
+    allow-circular-references: true
+  jackson:
+    time-zone: GMT+8
+    date-format: yyyy-MM-dd HH:mm:ss
+
+  # 文件上传限制
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+# Sa-Token 权限配置
+sa-token:
+  token-name: Authorization
+  timeout: 2592000 # 30天
+  active-timeout: -1
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+  is-log: false
+  token-prefix: Bearer
+
+# MyBatis Plus 配置
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: delFlag
+      logic-delete-value: 2
+      logic-not-delete-value: 0
+
+# OpenAPI 3 契约自动生成 (springdoc 反射扫描 Controller，产出入参/出参/Schema)
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  packages-to-scan: com.ragagent
+  paths-to-match: /api/**
+  default-produces-media-type: application/json
+  writer-with-order-by-keys: true
+  show-actuator: false
+  # 文档界面统一使用 Scalar，不启用 Swagger UI
+  swagger-ui:
+    enabled: false
+
+# Scalar 交互式文档界面 (路由: /scalar, /docs, /doc.html)
+scalar:
+  title: "Java RAG + Agent 平台 API 接口文档"
+  # 可选主题: default / alternate / moon / purple / solarized / bluePlanet / saturn / kepler / mars / deepSpace
+  theme: deepSpace

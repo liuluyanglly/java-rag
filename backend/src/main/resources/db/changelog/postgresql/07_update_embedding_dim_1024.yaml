@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 07-update-embedding-dim-1024
+      author: antigravity
+      comment: "升级向量存储底表与长期记忆表维度至 1024 (适配 BAAI/bge-m3 模型)"
+      changes:
+        - sql:
+            comment: "修改 vector_store 向量列维度为 1024 并更新相关模型字段"
+            sql: |
+              DO $$
+              BEGIN
+                  -- 1. 删除旧的 HNSW 索引以允许修改字段类型
+                  DROP INDEX IF EXISTS vector_store_hnsw_idx;
+                  
+                  -- 2. 修改 vector_store 表的 embedding 维度为 1024 (兼容转换旧数据)
+                  ALTER TABLE vector_store ALTER COLUMN embedding TYPE vector(1024) USING NULL;
+                  
+                  -- 3. 重建 1024 维的 HNSW 索引
+                  CREATE INDEX IF NOT EXISTS vector_store_hnsw_idx ON vector_store USING hnsw (embedding vector_cosine_ops);
+
+                  -- 4. 同步修改长期记忆表的 embedding 维度为 1024
+                  ALTER TABLE ai_agent_memory ALTER COLUMN embedding TYPE vector(1024) USING NULL;
+
+                  -- 5. 更新 ai_dataset 中默认的 embedding_model 为 BAAI/bge-m3
+                  ALTER TABLE ai_dataset ALTER COLUMN embedding_model SET DEFAULT 'BAAI/bge-m3';
+                  UPDATE ai_dataset SET embedding_model = 'BAAI/bge-m3' WHERE embedding_model = 'text-embedding-3-small' OR embedding_model IS NULL;
+              EXCEPTION WHEN OTHERS THEN
+                  RAISE NOTICE '向量表维度调整异常或 vector 扩展未就绪: %', SQLERRM;
+              END $$;

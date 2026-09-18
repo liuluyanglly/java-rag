@@ -1,0 +1,503 @@
+-- ========================================================
+-- Java RAG + Agent 平台数据库初始化全量脚本 (PostgreSQL 16)
+-- 包含 16 张核心业务底表、全字段注释、索引及若依 RBAC 初始数据
+-- ========================================================
+
+-- ----------------------------
+-- 1. 用户基础信息表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS sys_user (
+    user_id BIGSERIAL PRIMARY KEY,
+    username VARCHAR(64) NOT NULL UNIQUE,
+    nick_name VARCHAR(64) NOT NULL,
+    password VARCHAR(128) NOT NULL,
+    email VARCHAR(128),
+    phone VARCHAR(32),
+    avatar VARCHAR(255),
+    status CHAR(1) DEFAULT '0',
+    del_flag CHAR(1) DEFAULT '0',
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE sys_user IS '系统用户基础信息表';
+COMMENT ON COLUMN sys_user.user_id IS '用户ID，自增主键';
+COMMENT ON COLUMN sys_user.username IS '登录账号唯一用户名';
+COMMENT ON COLUMN sys_user.nick_name IS '用户显示昵称';
+COMMENT ON COLUMN sys_user.password IS 'BCrypt哈希加密密码密文';
+COMMENT ON COLUMN sys_user.email IS '用户联系电子邮箱';
+COMMENT ON COLUMN sys_user.phone IS '用户联系手机号码';
+COMMENT ON COLUMN sys_user.avatar IS '用户头像存储URL';
+COMMENT ON COLUMN sys_user.status IS '帐号状态（0-正常, 1-停用）';
+COMMENT ON COLUMN sys_user.del_flag IS '逻辑删除标志（0-正常存在, 2-代表已删除）';
+COMMENT ON COLUMN sys_user.create_time IS '账号注册创建时间';
+COMMENT ON COLUMN sys_user.update_time IS '账号最后修改时间';
+
+-- ----------------------------
+-- 2. 角色权限表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS sys_role (
+    role_id BIGSERIAL PRIMARY KEY,
+    role_name VARCHAR(64) NOT NULL,
+    role_key VARCHAR(64) NOT NULL UNIQUE,
+    role_sort INT DEFAULT 1,
+    status CHAR(1) DEFAULT '0',
+    del_flag CHAR(1) DEFAULT '0',
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE sys_role IS '系统角色权限表';
+COMMENT ON COLUMN sys_role.role_id IS '角色ID，自增主键';
+COMMENT ON COLUMN sys_role.role_name IS '角色中文展示名称';
+COMMENT ON COLUMN sys_role.role_key IS '角色权限唯一字符标识（如: admin, user）';
+COMMENT ON COLUMN sys_role.role_sort IS '展示排序次序';
+COMMENT ON COLUMN sys_role.status IS '角色状态（0-正常, 1-停用）';
+COMMENT ON COLUMN sys_role.del_flag IS '删除标志（0-正常存在, 2-代表已删除）';
+COMMENT ON COLUMN sys_role.create_time IS '角色创建时间';
+COMMENT ON COLUMN sys_role.update_time IS '角色修改时间';
+
+-- ----------------------------
+-- 3. 菜单与功能权限字典表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS sys_menu (
+    menu_id BIGSERIAL PRIMARY KEY,
+    menu_name VARCHAR(64) NOT NULL,
+    parent_id BIGINT DEFAULT 0,
+    order_num INT DEFAULT 0,
+    path VARCHAR(255),
+    component VARCHAR(255),
+    is_frame INT DEFAULT 0,
+    menu_type CHAR(1) DEFAULT 'C',
+    visible CHAR(1) DEFAULT '0',
+    status CHAR(1) DEFAULT '0',
+    perms VARCHAR(128),
+    icon VARCHAR(64),
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE sys_menu IS '系统菜单与功能权限字典表';
+COMMENT ON COLUMN sys_menu.menu_id IS '菜单ID，自增主键';
+COMMENT ON COLUMN sys_menu.menu_name IS '菜单显示名称';
+COMMENT ON COLUMN sys_menu.parent_id IS '父级菜单ID（0表示顶级根菜单）';
+COMMENT ON COLUMN sys_menu.order_num IS '同级显示顺序编号';
+COMMENT ON COLUMN sys_menu.path IS '前端路由跳转路径URL';
+COMMENT ON COLUMN sys_menu.component IS '前端对应Vue/React组件映射路径';
+COMMENT ON COLUMN sys_menu.is_frame IS '是否为外部链接内嵌（0-否, 1-是）';
+COMMENT ON COLUMN sys_menu.menu_type IS '菜单类型（M-目录, C-菜单, F-按钮操作权限）';
+COMMENT ON COLUMN sys_menu.visible IS '导航菜单是否可见（0-显示, 1-隐藏）';
+COMMENT ON COLUMN sys_menu.status IS '菜单启用状态（0-正常, 1-停用）';
+COMMENT ON COLUMN sys_menu.perms IS '后端API鉴权标识（如: ai:dataset:list）';
+COMMENT ON COLUMN sys_menu.icon IS '菜单展示图标名称';
+COMMENT ON COLUMN sys_menu.create_time IS '菜单创建时间';
+COMMENT ON COLUMN sys_menu.update_time IS '菜单修改时间';
+
+-- ----------------------------
+-- 4. 用户与角色分配中间表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS sys_user_role (
+    user_id BIGINT NOT NULL,
+    role_id BIGINT NOT NULL,
+    PRIMARY KEY (user_id, role_id)
+);
+COMMENT ON TABLE sys_user_role IS '用户与角色分配中间关联表';
+COMMENT ON COLUMN sys_user_role.user_id IS '关联用户表sys_user的主键ID';
+COMMENT ON COLUMN sys_user_role.role_id IS '关联角色表sys_role的主键ID';
+
+-- ----------------------------
+-- 5. 角色与菜单权限分配中间表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS sys_role_menu (
+    role_id BIGINT NOT NULL,
+    menu_id BIGINT NOT NULL,
+    PRIMARY KEY (role_id, menu_id)
+);
+COMMENT ON TABLE sys_role_menu IS '角色与菜单权限分配中间关联表';
+COMMENT ON COLUMN sys_role_menu.role_id IS '关联角色表sys_role的主键ID';
+COMMENT ON COLUMN sys_role_menu.menu_id IS '关联菜单表sys_menu的主键ID';
+
+-- ----------------------------
+-- 6. 知识库数据集管理表 (支持双轨安全隔离)
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS ai_dataset (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    description TEXT,
+    avatar VARCHAR(255),
+    embedding_model VARCHAR(64) DEFAULT 'text-embedding-3-small',
+    chunk_size INT DEFAULT 500,
+    chunk_overlap INT DEFAULT 50,
+    doc_count INT DEFAULT 0,
+    chunk_count INT DEFAULT 0,
+    is_public BOOLEAN DEFAULT true,
+    isolation_type VARCHAR(32) DEFAULT 'LOGICAL',
+    isolated_schema VARCHAR(64),
+    security_level INT DEFAULT 1,
+    category VARCHAR(64) DEFAULT 'GENERAL',
+    created_by BIGINT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE ai_dataset IS '企业知识库数据集管理表（支持双轨隔离策略）';
+COMMENT ON COLUMN ai_dataset.id IS '知识库唯一ID，自增主键';
+COMMENT ON COLUMN ai_dataset.name IS '知识库名称';
+COMMENT ON COLUMN ai_dataset.description IS '知识库定位与业务背景描述';
+COMMENT ON COLUMN ai_dataset.avatar IS '知识库封面图标URL';
+COMMENT ON COLUMN ai_dataset.embedding_model IS '绑定的向量Embedding模型编码';
+COMMENT ON COLUMN ai_dataset.chunk_size IS '文本切片分块Token最大限制值';
+COMMENT ON COLUMN ai_dataset.chunk_overlap IS '分块重叠滑窗Token大小';
+COMMENT ON COLUMN ai_dataset.doc_count IS '收录的文档文件总数';
+COMMENT ON COLUMN ai_dataset.chunk_count IS '已切片分块生成的段落总数';
+COMMENT ON COLUMN ai_dataset.is_public IS '是否全员公开（true-全员公开, false-按角色白名单授权）';
+COMMENT ON COLUMN ai_dataset.isolation_type IS '隔离策略（LOGICAL-逻辑共享过滤, PHYSICAL-物理专属独立Schema）';
+COMMENT ON COLUMN ai_dataset.isolated_schema IS '物理隔离模式下的专属PostgreSQL Schema名称';
+COMMENT ON COLUMN ai_dataset.security_level IS '数据安全密级（1-普通公开, 2-内部涉密, 3-核心高密）';
+COMMENT ON COLUMN ai_dataset.category IS '知识库业务分类';
+COMMENT ON COLUMN ai_dataset.created_by IS '创建人用户ID';
+COMMENT ON COLUMN ai_dataset.create_time IS '创建时间';
+COMMENT ON COLUMN ai_dataset.update_time IS '最后更新时间';
+
+-- ----------------------------
+-- 7. 知识库角色权限分配表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS ai_dataset_role (
+    dataset_id BIGINT NOT NULL,
+    role_id BIGINT NOT NULL,
+    permission_type VARCHAR(16) DEFAULT 'READ',
+    PRIMARY KEY (dataset_id, role_id)
+);
+COMMENT ON TABLE ai_dataset_role IS '知识库角色访问权限分配表';
+COMMENT ON COLUMN ai_dataset_role.dataset_id IS '关联知识库ID';
+COMMENT ON COLUMN ai_dataset_role.role_id IS '关联角色ID';
+COMMENT ON COLUMN ai_dataset_role.permission_type IS '授权操作权限（READ-只读检索, WRITE-读写管理）';
+
+-- ----------------------------
+-- 8. 知识文档资产登记表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS ai_document (
+    id BIGSERIAL PRIMARY KEY,
+    dataset_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(512),
+    file_size BIGINT DEFAULT 0,
+    file_type VARCHAR(32),
+    status VARCHAR(32) DEFAULT 'PENDING',
+    chunk_count INT DEFAULT 0,
+    token_count INT DEFAULT 0,
+    error_msg TEXT,
+    created_by BIGINT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE ai_document IS '知识文档原件资产登记表';
+COMMENT ON COLUMN ai_document.id IS '文档ID，自增主键';
+COMMENT ON COLUMN ai_document.dataset_id IS '归属知识库ID';
+COMMENT ON COLUMN ai_document.name IS '文档原始文件名';
+COMMENT ON COLUMN ai_document.file_path IS '物理存储相对路径或OSS ObjectKey';
+COMMENT ON COLUMN ai_document.file_size IS '文件实际体积（字节Bytes）';
+COMMENT ON COLUMN ai_document.file_type IS '文件扩展名类型（pdf, docx, txt, md）';
+COMMENT ON COLUMN ai_document.status IS '解析切片处理状态（PENDING-排队中, PARSING-处理中, COMPLETED-已就绪, FAILED-失败）';
+COMMENT ON COLUMN ai_document.chunk_count IS '解析拆分出的切片块总数';
+COMMENT ON COLUMN ai_document.token_count IS '文档预估消耗Token总数';
+COMMENT ON COLUMN ai_document.error_msg IS '解析失败异常堆栈或原因描述';
+COMMENT ON COLUMN ai_document.created_by IS '上传人用户ID';
+COMMENT ON COLUMN ai_document.create_time IS '文档上传入库时间';
+COMMENT ON COLUMN ai_document.update_time IS '解析状态修改时间';
+
+-- ----------------------------
+-- 9. 文档段落切片分块存储表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS ai_document_chunk (
+    id BIGSERIAL PRIMARY KEY,
+    dataset_id BIGINT NOT NULL,
+    document_id BIGINT NOT NULL,
+    chunk_index INT DEFAULT 0,
+    content TEXT,
+    token_count INT DEFAULT 0,
+    metadata TEXT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE ai_document_chunk IS '文档段落切片分块存储表';
+COMMENT ON COLUMN ai_document_chunk.id IS '切片分块ID，自增主键';
+COMMENT ON COLUMN ai_document_chunk.dataset_id IS '归属知识库ID';
+COMMENT ON COLUMN ai_document_chunk.document_id IS '所属文档ID';
+COMMENT ON COLUMN ai_document_chunk.chunk_index IS '在文档中的相对段落自然顺序号';
+COMMENT ON COLUMN ai_document_chunk.content IS '段落正文实际切片文本内容';
+COMMENT ON COLUMN ai_document_chunk.token_count IS '该段切片所包含的Token计算值';
+COMMENT ON COLUMN ai_document_chunk.metadata IS '切片附加元数据（JSON字符串，包含权限/标题等）';
+COMMENT ON COLUMN ai_document_chunk.create_time IS '切片入库持久化时间';
+
+CREATE INDEX IF NOT EXISTS idx_chunk_dataset ON ai_document_chunk(dataset_id);
+CREATE INDEX IF NOT EXISTS idx_chunk_doc ON ai_document_chunk(document_id);
+
+-- ----------------------------
+-- 10. GraphRAG 知识图谱抽取实体表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS ai_graph_entity (
+    id BIGSERIAL PRIMARY KEY,
+    dataset_id BIGINT NOT NULL,
+    entity_name VARCHAR(128) NOT NULL,
+    entity_type VARCHAR(64),
+    description TEXT,
+    metadata TEXT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE ai_graph_entity IS 'GraphRAG 知识图谱抽取实体表';
+COMMENT ON COLUMN ai_graph_entity.id IS '图谱实体ID，自增主键';
+COMMENT ON COLUMN ai_graph_entity.dataset_id IS '归属知识库ID';
+COMMENT ON COLUMN ai_graph_entity.entity_name IS '抽取提炼出的实体概念名称';
+COMMENT ON COLUMN ai_graph_entity.entity_type IS '实体分类类型（如: 组织, 规范, 技术术语, 概念）';
+COMMENT ON COLUMN ai_graph_entity.description IS '实体语义概念的百科释义说明';
+COMMENT ON COLUMN ai_graph_entity.metadata IS '实体附加结构化元数据（JSON字符串）';
+COMMENT ON COLUMN ai_graph_entity.create_time IS '实体抽取记录入库时间';
+
+CREATE INDEX IF NOT EXISTS idx_graph_entity_ds ON ai_graph_entity(dataset_id);
+
+-- ----------------------------
+-- 11. GraphRAG 知识图谱三元组关系表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS ai_graph_relation (
+    id BIGSERIAL PRIMARY KEY,
+    dataset_id BIGINT NOT NULL,
+    source_entity VARCHAR(128) NOT NULL,
+    relation_name VARCHAR(128) NOT NULL,
+    target_entity VARCHAR(128) NOT NULL,
+    weight NUMERIC(5,2) DEFAULT 1.00,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE ai_graph_relation IS 'GraphRAG 知识图谱三元组关系网络拓扑表';
+COMMENT ON COLUMN ai_graph_relation.id IS '关系三元组ID，自增主键';
+COMMENT ON COLUMN ai_graph_relation.dataset_id IS '归属知识库ID';
+COMMENT ON COLUMN ai_graph_relation.source_entity IS '关系发起端头实体名称（Subject）';
+COMMENT ON COLUMN ai_graph_relation.relation_name IS '关联谓词名称（Predicate）';
+COMMENT ON COLUMN ai_graph_relation.target_entity IS '关系受词端尾实体名称（Object）';
+COMMENT ON COLUMN ai_graph_relation.weight IS '三元组依赖强度置信度权重（0.00~1.00）';
+COMMENT ON COLUMN ai_graph_relation.create_time IS '关系建立时间';
+
+CREATE INDEX IF NOT EXISTS idx_graph_rel_ds ON ai_graph_relation(dataset_id);
+
+-- ----------------------------
+-- 12. AI智能体模型编排配置表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS ai_agent (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    description TEXT,
+    avatar VARCHAR(255),
+    model_name VARCHAR(64) DEFAULT 'deepseek-chat',
+    system_prompt TEXT,
+    temperature NUMERIC(3,2) DEFAULT 0.70,
+    max_tokens INT DEFAULT 4096,
+    dataset_ids TEXT,
+    tools TEXT,
+    is_public BOOLEAN DEFAULT true,
+    status CHAR(1) DEFAULT '0',
+    created_by BIGINT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE ai_agent IS 'AI智能体模型编排配置表';
+COMMENT ON COLUMN ai_agent.id IS '智能体ID，自增主键';
+COMMENT ON COLUMN ai_agent.name IS '智能体展示名称';
+COMMENT ON COLUMN ai_agent.description IS '智能体功能定位说明';
+COMMENT ON COLUMN ai_agent.avatar IS '智能体头像URL';
+COMMENT ON COLUMN ai_agent.model_name IS '底层调用大模型标识（如: deepseek-chat, gpt-4o）';
+COMMENT ON COLUMN ai_agent.system_prompt IS '智能体系统提示词人设模板（System Prompt）';
+COMMENT ON COLUMN ai_agent.temperature IS 'LLM生成发散温度参数（0.0~1.0）';
+COMMENT ON COLUMN ai_agent.max_tokens IS '单次回复生成的最大Token输出阈值';
+COMMENT ON COLUMN ai_agent.dataset_ids IS '挂载关联的知识库ID集合（JSON格式数组）';
+COMMENT ON COLUMN ai_agent.tools IS '启用的工具/MCP插件名称集合（JSON格式数组）';
+COMMENT ON COLUMN ai_agent.is_public IS '是否公开可用（true-全员公开, false-私有私享）';
+COMMENT ON COLUMN ai_agent.status IS '智能体服务状态（0-正常, 1-停用）';
+COMMENT ON COLUMN ai_agent.created_by IS '创建人用户ID';
+COMMENT ON COLUMN ai_agent.create_time IS '创建时间';
+COMMENT ON COLUMN ai_agent.update_time IS '修改配置时间';
+
+-- ----------------------------
+-- 13. 多轮对话会话历史聚合表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS ai_chat_session (
+    id BIGSERIAL PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
+    agent_id BIGINT,
+    title VARCHAR(255) DEFAULT '新对话',
+    pinned BOOLEAN DEFAULT false,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE ai_chat_session IS '多轮对话会话历史聚合表';
+COMMENT ON COLUMN ai_chat_session.id IS '自增主键ID';
+COMMENT ON COLUMN ai_chat_session.session_id IS '全局跨系统唯一会话UUID';
+COMMENT ON COLUMN ai_chat_session.user_id IS '归属用户ID';
+COMMENT ON COLUMN ai_chat_session.agent_id IS '关联调用的智能体配置ID';
+COMMENT ON COLUMN ai_chat_session.title IS '会话摘要标题（自动提炼或用户自定义）';
+COMMENT ON COLUMN ai_chat_session.pinned IS '是否置顶固定在对话列表顶部';
+COMMENT ON COLUMN ai_chat_session.create_time IS '会话创建时间';
+COMMENT ON COLUMN ai_chat_session.update_time IS '该会话最后一次交互活跃时间';
+
+CREATE INDEX IF NOT EXISTS idx_session_user ON ai_chat_session(user_id);
+
+-- ----------------------------
+-- 14. 对话流单条消息明细记录表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS ai_chat_message (
+    id BIGSERIAL PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL,
+    role VARCHAR(32) NOT NULL,
+    content TEXT,
+    thought TEXT,
+    tokens INT DEFAULT 0,
+    tool_calls TEXT,
+    citations TEXT,
+    feedback VARCHAR(32),
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE ai_chat_message IS '对话流单条消息明细记录表';
+COMMENT ON COLUMN ai_chat_message.id IS '消息唯一自增ID';
+COMMENT ON COLUMN ai_chat_message.session_id IS '归属会话UUID';
+COMMENT ON COLUMN ai_chat_message.role IS '发信角色（user-用户, assistant-大模型助手, system-系统, tool-工具调用返回）';
+COMMENT ON COLUMN ai_chat_message.content IS '消息正文文本内容';
+COMMENT ON COLUMN ai_chat_message.thought IS '深度思考推理链明细（DeepSeek-R1思维链或OpenAI推理记录）';
+COMMENT ON COLUMN ai_chat_message.tokens IS '本条消息消耗的Token量统计';
+COMMENT ON COLUMN ai_chat_message.tool_calls IS '工具调用入参与出参轨迹记录（JSON字符串）';
+COMMENT ON COLUMN ai_chat_message.citations IS '知识库RAG检索溯源切片引用详情（JSON字符串）';
+COMMENT ON COLUMN ai_chat_message.feedback IS '用户满意度打分（like-点赞, dislike-点踩）';
+COMMENT ON COLUMN ai_chat_message.create_time IS '消息生成落库时间';
+
+CREATE INDEX IF NOT EXISTS idx_msg_session ON ai_chat_message(session_id);
+
+-- ----------------------------
+-- 15. StateGraph 工作流持久化快照表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS graph_checkpoint (
+    checkpoint_id VARCHAR(64) PRIMARY KEY,
+    thread_id VARCHAR(64) NOT NULL,
+    node_name VARCHAR(64) NOT NULL,
+    state_json TEXT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE graph_checkpoint IS 'Spring AI Alibaba Graph 状态图工作流持久化检查点表';
+COMMENT ON COLUMN graph_checkpoint.checkpoint_id IS '检查点快照全局唯一UUID';
+COMMENT ON COLUMN graph_checkpoint.thread_id IS '工作流实例运行Thread唯一线程标识';
+COMMENT ON COLUMN graph_checkpoint.node_name IS '产生快照的当前执行节点名称';
+COMMENT ON COLUMN graph_checkpoint.state_json IS '当前节点的全局图状态全量快照（GraphState序列化JSON）';
+COMMENT ON COLUMN graph_checkpoint.create_time IS '快照持久化保存时间';
+
+CREATE INDEX IF NOT EXISTS idx_checkpoint_thread ON graph_checkpoint(thread_id, create_time DESC);
+
+-- ----------------------------
+-- 16. Spring AI pgvector 向量检索底表
+-- ----------------------------
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS vector;
+    CREATE TABLE IF NOT EXISTS vector_store (
+        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+        content text,
+        metadata json,
+        embedding vector(1536)
+    );
+    CREATE INDEX IF NOT EXISTS vector_store_hnsw_idx ON vector_store USING hnsw (embedding vector_cosine_ops);
+    COMMENT ON TABLE vector_store IS 'Spring AI pgvector 向量嵌入检索底表';
+    COMMENT ON COLUMN vector_store.id IS '向量记录唯一UUID主键';
+    COMMENT ON COLUMN vector_store.content IS '切片原始纯文本内容';
+    COMMENT ON COLUMN vector_store.metadata IS '元数据过滤JSON对象（如: dataset_id, roles, 密级等）';
+    COMMENT ON COLUMN vector_store.embedding IS '1536维稠密高维向量数据';
+EXCEPTION WHEN OTHERS THEN
+    CREATE TABLE IF NOT EXISTS vector_store (
+        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+        content text,
+        metadata json
+    );
+    COMMENT ON TABLE vector_store IS '向量存储降级纯文本兼容表';
+    COMMENT ON COLUMN vector_store.id IS '记录唯一UUID主键';
+    COMMENT ON COLUMN vector_store.content IS '原始纯文本内容';
+    COMMENT ON COLUMN vector_store.metadata IS '元数据过滤JSON对象';
+END $$;
+
+-- ----------------------------
+-- 17. 基础初始化数据
+-- ----------------------------
+-- 超级管理员账号 (默认密码 admin123)
+INSERT INTO sys_user (user_id, username, nick_name, password, email, phone, avatar, status, del_flag)
+VALUES (1, 'admin', '超级管理员', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOpkJqG3mgGuqNeCG', 'admin@ragagent.com', '13800000000', '', '0', '0')
+ON CONFLICT (user_id) DO NOTHING;
+
+-- 角色定义
+INSERT INTO sys_role (role_id, role_name, role_key, role_sort, status, del_flag)
+VALUES 
+(1, '超级管理员', 'admin', 1, '0', '0'),
+(2, '普通成员', 'user', 2, '0', '0')
+ON CONFLICT (role_id) DO NOTHING;
+
+-- 用户关联管理员角色
+INSERT INTO sys_user_role (user_id, role_id)
+VALUES (1, 1)
+ON CONFLICT DO NOTHING;
+
+-- 基础菜单字典
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, is_frame, menu_type, visible, status, perms, icon)
+VALUES
+(1, '智能对话工作台', 0, 1, 'chat', 'chat/index', 0, 'C', '0', '0', 'ai:chat:view', 'ChatDotRound'),
+(2, '深度搜研工坊', 0, 2, 'research', 'research/index', 0, 'C', '0', '0', 'ai:research:view', 'AimOutlined'),
+(3, '企业知识库', 0, 3, 'dataset', 'dataset/index', 0, 'C', '0', '0', 'ai:dataset:list', 'FolderOpenOutlined'),
+(4, '智能体编排', 0, 4, 'agent', 'agent/index', 0, 'C', '0', '0', 'ai:agent:list', 'RobotOutlined'),
+(5, '系统管理', 0, 5, 'system', 'system/index', 0, 'M', '0', '0', 'system:manage', 'SettingOutlined'),
+(6, '用户管理', 5, 1, 'system/user', 'system/user/index', 0, 'C', '0', '0', 'system:user:list', 'UserOutlined'),
+(7, '角色管理', 5, 2, 'system/role', 'system/role/index', 0, 'C', '0', '0', 'system:role:list', 'SafetyCertificateOutlined'),
+(8, '菜单管理', 5, 3, 'system/menu', 'system/menu/index', 0, 'C', '0', '0', 'system:menu:list', 'MenuOutlined')
+ON CONFLICT (menu_id) DO NOTHING;
+
+-- 角色与菜单关联
+INSERT INTO sys_role_menu (role_id, menu_id)
+VALUES 
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8)
+ON CONFLICT DO NOTHING;
+
+-- 初始化默认知识库与智能体
+INSERT INTO ai_dataset (id, name, description, avatar, embedding_model, chunk_size, chunk_overlap, is_public, isolation_type, security_level, created_by)
+VALUES (1, '企业通用知识库', '包含公司规章制度、通用技术规范及产品文档', 'https://api.dicebear.com/7.x/bottts/svg?seed=dataset1', 'text-embedding-3-small', 500, 50, true, 'LOGICAL', 1, 1)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO ai_agent (id, name, description, avatar, model_name, system_prompt, temperature, max_tokens, dataset_ids, tools, is_public, status, created_by)
+VALUES (1, '企业知识助理', '基于 Spring AI Alibaba Graph 构建的高智能知识问答助手', 'https://api.dicebear.com/7.x/bottts/svg?seed=agent1', 'agnes-2.5-flash', '你是一名专业的企业级知识库问答助手，请严谨、准确地基于检索到的上下文回答问题。', 0.70, 4096, '[1]', '["knowledgeSearch"]', true, '0', 1)
+ON CONFLICT (id) DO NOTHING;
+
+-- 重置自增序列
+SELECT setval('sys_user_user_id_seq', (SELECT COALESCE(MAX(user_id), 1) FROM sys_user));
+SELECT setval('sys_role_role_id_seq', (SELECT COALESCE(MAX(role_id), 1) FROM sys_role));
+SELECT setval('sys_menu_menu_id_seq', (SELECT COALESCE(MAX(menu_id), 1) FROM sys_menu));
+SELECT setval('ai_dataset_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_dataset));
+SELECT setval('ai_agent_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_agent));
+
+-- ----------------------------
+-- 17. 深度研究任务与研报产出表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS ai_research_task (
+    id BIGSERIAL PRIMARY KEY,
+    task_id VARCHAR(64) NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
+    topic TEXT NOT NULL,
+    status VARCHAR(32) DEFAULT 'PLANNING',
+    plan_steps TEXT,
+    current_step INT DEFAULT 0,
+    report_markdown TEXT,
+    citations TEXT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE ai_research_task IS '深度研究任务与研报产出表（StateGraph 多Agent工作流驱动）';
+COMMENT ON COLUMN ai_research_task.id IS '自增主键ID';
+COMMENT ON COLUMN ai_research_task.task_id IS '任务全局唯一UUID，用于订阅SSE进度流与查询详情';
+COMMENT ON COLUMN ai_research_task.user_id IS '发起人用户ID';
+COMMENT ON COLUMN ai_research_task.topic IS '研究课题原文';
+COMMENT ON COLUMN ai_research_task.status IS '工作流状态（PLANNING-大纲规划中, RESEARCHING-多步并发调研中, VERIFYING-事实交叉核验, COMPLETED-报告已完成, FAILED-失败）';
+COMMENT ON COLUMN ai_research_task.plan_steps IS '由PlanNode拆解出的研究步骤清单（JSON数组字符串）';
+COMMENT ON COLUMN ai_research_task.current_step IS '当前已执行到的步骤序号，从0开始';
+COMMENT ON COLUMN ai_research_task.report_markdown IS '最终长篇结构化研报正文（Markdown格式，仅status=COMPLETED时有值）';
+COMMENT ON COLUMN ai_research_task.citations IS '研报引用来源列表（JSON数组字符串）';
+COMMENT ON COLUMN ai_research_task.create_time IS '任务提交时间';
+COMMENT ON COLUMN ai_research_task.update_time IS '状态最后流转时间';
+
+CREATE INDEX IF NOT EXISTS idx_research_task_user ON ai_research_task(user_id);
+CREATE INDEX IF NOT EXISTS idx_research_task_status ON ai_research_task(status);
+SELECT setval('ai_research_task_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_research_task));

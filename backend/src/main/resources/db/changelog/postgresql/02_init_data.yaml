@@ -1,0 +1,68 @@
+databaseChangeLog:
+  - changeSet:
+      id: init-data-rbac-and-menus
+      author: ragagent
+      comment: 初始化若依风格RBAC基础数据与系统菜单
+      changes:
+        - sql:
+            sql: |
+              -- 1. 插入超级管理员 (默认账号 admin / 密码 admin123, BCrypt加密)
+              INSERT INTO sys_user (user_id, username, nick_name, password, email, phone, avatar, status, del_flag)
+              VALUES (1, 'admin', '超级管理员', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOpkJqG3mgGuqNeCG', 'admin@ragagent.com', '13800000000', '', '0', '0')
+              ON CONFLICT (user_id) DO NOTHING;
+
+              -- 2. 插入角色
+              INSERT INTO sys_role (role_id, role_name, role_key, role_sort, status, del_flag)
+              VALUES 
+              (1, '超级管理员', 'admin', 1, '0', '0'),
+              (2, '普通成员', 'user', 2, '0', '0')
+              ON CONFLICT (role_id) DO NOTHING;
+
+              -- 3. 关联管理员与超级管理员角色
+              INSERT INTO sys_user_role (user_id, role_id)
+              VALUES (1, 1)
+              ON CONFLICT DO NOTHING;
+
+              -- 4. 插入系统菜单结构 (若依风格)
+              INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, is_frame, menu_type, visible, status, perms, icon)
+              VALUES
+              (1, '智能对话工作台', 0, 1, 'chat', 'chat/index', 0, 'C', '0', '0', 'ai:chat:view', 'ChatDotRound'),
+              (2, '深度搜研工坊', 0, 2, 'research', 'research/index', 0, 'C', '0', '0', 'ai:research:view', 'AimOutlined'),
+              (3, '企业知识库', 0, 3, 'dataset', 'dataset/index', 0, 'C', '0', '0', 'ai:dataset:list', 'FolderOpenOutlined'),
+              (4, '智能体编排', 0, 4, 'agent', 'agent/index', 0, 'C', '0', '0', 'ai:agent:list', 'RobotOutlined'),
+              (5, '系统管理', 0, 5, 'system', 'system/index', 0, 'M', '0', '0', 'system:manage', 'SettingOutlined'),
+              (6, '用户管理', 5, 1, 'system/user', 'system/user/index', 0, 'C', '0', '0', 'system:user:list', 'UserOutlined'),
+              (7, '角色管理', 5, 2, 'system/role', 'system/role/index', 0, 'C', '0', '0', 'system:role:list', 'SafetyCertificateOutlined'),
+              (8, '菜单管理', 5, 3, 'system/menu', 'system/menu/index', 0, 'C', '0', '0', 'system:menu:list', 'MenuOutlined')
+              ON CONFLICT (menu_id) DO NOTHING;
+
+              -- 5. 超级管理员绑定全部菜单
+              INSERT INTO sys_role_menu (role_id, menu_id)
+              VALUES 
+              (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8)
+              ON CONFLICT DO NOTHING;
+
+              -- 重置自增序列最大值，防止后续新增主键冲突
+              SELECT setval('sys_user_user_id_seq', (SELECT COALESCE(MAX(user_id), 1) FROM sys_user));
+              SELECT setval('sys_role_role_id_seq', (SELECT COALESCE(MAX(role_id), 1) FROM sys_role));
+              SELECT setval('sys_menu_menu_id_seq', (SELECT COALESCE(MAX(menu_id), 1) FROM sys_menu));
+
+  - changeSet:
+      id: init-data-default-rag-agent
+      author: ragagent
+      comment: 初始化默认示例智能体与示例知识库
+      changes:
+        - sql:
+            sql: |
+              -- 示例知识库 (双轨隔离演示：默认逻辑隔离)
+              INSERT INTO ai_dataset (id, name, description, avatar, embedding_model, chunk_size, chunk_overlap, is_public, isolation_type, security_level, created_by)
+              VALUES (1, '企业通用知识库', '包含公司规章制度、通用技术规范及产品文档', 'https://api.dicebear.com/7.x/bottts/svg?seed=dataset1', 'text-embedding-3-small', 500, 50, true, 'LOGICAL', 1, 1)
+              ON CONFLICT (id) DO NOTHING;
+
+              -- 示例智能体 (配备知识检索与四维RAG能力)
+              INSERT INTO ai_agent (id, name, description, avatar, model_name, system_prompt, temperature, max_tokens, dataset_ids, tools, is_public, status, created_by)
+              VALUES (1, '企业知识助理', '基于 Spring AI Alibaba Graph 构建的高智能知识问答助手', 'https://api.dicebear.com/7.x/bottts/svg?seed=agent1', 'agnes-2.5-flash', '你是一名专业的企业级知识库问答助手，请严谨、准确地基于检索到的上下文回答问题。', 0.70, 4096, '[1]', '["knowledgeSearch"]', true, '0', 1)
+              ON CONFLICT (id) DO NOTHING;
+
+              SELECT setval('ai_dataset_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_dataset));
+              SELECT setval('ai_agent_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_agent));

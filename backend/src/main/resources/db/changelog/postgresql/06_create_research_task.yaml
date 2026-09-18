@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-ai-research-task
+      author: ragagent
+      comment: 创建深度研究任务与研报产出表，用于持久化 StateGraph 驱动的多 Agent 深度搜研工作流任务
+      changes:
+        - sql:
+            sql: |
+              -- 17. 深度研究任务与研报产出表
+              CREATE TABLE IF NOT EXISTS ai_research_task (
+                  id BIGSERIAL PRIMARY KEY,
+                  task_id VARCHAR(64) NOT NULL UNIQUE,
+                  user_id BIGINT NOT NULL,
+                  topic TEXT NOT NULL,
+                  status VARCHAR(32) DEFAULT 'PLANNING',
+                  plan_steps TEXT,
+                  current_step INT DEFAULT 0,
+                  report_markdown TEXT,
+                  citations TEXT,
+                  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              );
+              COMMENT ON TABLE ai_research_task IS '深度研究任务与研报产出表（StateGraph 多Agent工作流驱动）';
+              COMMENT ON COLUMN ai_research_task.id IS '自增主键ID';
+              COMMENT ON COLUMN ai_research_task.task_id IS '任务全局唯一UUID，用于订阅SSE进度流与查询详情';
+              COMMENT ON COLUMN ai_research_task.user_id IS '发起人用户ID';
+              COMMENT ON COLUMN ai_research_task.topic IS '研究课题原文';
+              COMMENT ON COLUMN ai_research_task.status IS '工作流状态（PLANNING-大纲规划中, RESEARCHING-多步并发调研中, VERIFYING-事实交叉核验, COMPLETED-报告已完成, FAILED-失败）';
+              COMMENT ON COLUMN ai_research_task.plan_steps IS '由PlanNode拆解出的研究步骤清单（JSON数组字符串）';
+              COMMENT ON COLUMN ai_research_task.current_step IS '当前已执行到的步骤序号，从0开始';
+              COMMENT ON COLUMN ai_research_task.report_markdown IS '最终长篇结构化研报正文（Markdown格式，仅status=COMPLETED时有值）';
+              COMMENT ON COLUMN ai_research_task.citations IS '研报引用来源列表（JSON数组字符串）';
+              COMMENT ON COLUMN ai_research_task.create_time IS '任务提交时间';
+              COMMENT ON COLUMN ai_research_task.update_time IS '状态最后流转时间';
+
+              CREATE INDEX IF NOT EXISTS idx_research_task_user ON ai_research_task(user_id);
+              CREATE INDEX IF NOT EXISTS idx_research_task_status ON ai_research_task(status);

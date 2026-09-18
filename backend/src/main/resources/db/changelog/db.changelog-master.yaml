@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/postgresql/01_init_schema.yaml
+  - include:
+      file: db/changelog/postgresql/02_init_data.yaml
+  - include:
+      file: db/changelog/postgresql/03_example_alter_table.yaml
+  - include:
+      file: db/changelog/postgresql/04_create_agent_memory.yaml
+  - include:
+      file: db/changelog/postgresql/05_reset_admin_password.yaml
+  - include:
+      file: db/changelog/postgresql/06_create_research_task.yaml
+  - include:
+      file: db/changelog/postgresql/07_update_embedding_dim_1024.yaml
+  - include:
+      file: db/changelog/postgresql/08_update_agent_model_agnes3.yaml

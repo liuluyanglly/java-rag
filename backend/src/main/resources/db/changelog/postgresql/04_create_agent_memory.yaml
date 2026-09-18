@@ -1,0 +1,81 @@
+databaseChangeLog:
+  - changeSet:
+      id: 04-create-agent-memory
+      author: antigravity
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: ai_agent_memory
+      changes:
+        - createTable:
+            tableName: ai_agent_memory
+            columns:
+              - column:
+                  name: id
+                  type: VARCHAR(64)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: agent_id
+                  type: BIGINT
+                  constraints:
+                    nullable: true
+              - column:
+                  name: session_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: memory_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: importance
+                  type: DOUBLE PRECISION
+                  defaultValueNumeric: 1.0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: access_count
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: metadata
+                  type: TEXT
+                  constraints:
+                    nullable: true
+              - column:
+                  name: create_time
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: update_time
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: last_accessed_time
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+
+        - sql:
+            comment: "为长期记忆表添加 vector(1536) 向量列"
+            sql: "ALTER TABLE ai_agent_memory ADD COLUMN IF NOT EXISTS embedding vector(1536);"
+
+        - sql:
+            comment: "为长期记忆表创建组合索引"
+            sql: "CREATE INDEX IF NOT EXISTS idx_memory_user ON ai_agent_memory (user_id, memory_type);"

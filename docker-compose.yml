@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  postgres-vector:
+    image: pgvector/pgvector:pg16
+    container_name: java-rag-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: java_rag_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: rootpassword
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - rag-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: java-rag-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass "redis123"
+    volumes:
+      - redisdata:/data
+    networks:
+      - rag-net
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  rag-net:
+    driver: bridge

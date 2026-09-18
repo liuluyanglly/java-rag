@@ -1,0 +1,37 @@
+{
+  "name": "java-rag-agent-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.5.1",
+    "@ant-design/x": "^1.0.1",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "antd": "^5.21.4",
+    "axios": "^1.7.7",
+    "html2pdf.js": "^0.14.0",
+    "lucide-react": "^0.453.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.1.0",
+    "react-router-dom": "^6.27.0",
+    "react-syntax-highlighter": "^16.1.1",
+    "remark-gfm": "^4.0.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21"
+  }
+}

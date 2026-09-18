@@ -1,0 +1,79 @@
+# ========================================================
+# 开发环境动态配置 (application-dev.yml)
+# 针对内网 PostgreSQL 16 (java_rag) 与 Redis (10号库)
+# ========================================================
+
+server:
+  port: 8888
+
+spring:
+  # 数据源配置 (PostgreSQL 16 + pgvector，参考 kumhosunny-admin-basic 配置标准)
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:192.168.200.188}:${DB_PORT:5432}/${DB_NAME:java_rag}?currentSchema=public&reWriteBatchedInserts=true&options=-c%20TimeZone=Asia/Shanghai&sslmode=prefer&channelBinding=prefer&stringtype=unspecified
+    username: ${DB_USER:postgres}
+    password: ${DB_PWD:postgres}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      keepaliveTime: 30000
+      max-lifetime: 1800000
+
+  # Liquibase 自动化数据库版本迁移 (每次修改增加一个 YAML，启动时自动无感更新数据库)
+  liquibase:
+    enabled: true
+    change-log: classpath:/db/changelog/db.changelog-master.yaml
+
+  # Redis 缓存配置 (参考 kumhosunny-admin-basic，指定使用 10 号数据库)
+  data:
+    redis:
+      host: ${REDIS_HOST:192.168.200.188}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DB:10}
+      timeout: 10s
+
+  ai:
+    retry:
+      max-attempts: 1
+    openai:
+      api-key: ${AI_API_KEY:sk-jR7NJdCSU4VHCZWtEpYaSL6Ta61kKbVRVU9BS0SGQr9mcw0H}
+      base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com}
+      chat:
+        options:
+          model: ${AI_CHAT_MODEL:agnes-3.0-flash}
+          temperature: 0.7
+      embedding:
+        enabled: ${AI_EMBEDDING_ENABLED:true}
+        base-url: ${EMBEDDING_BASE_URL:http://192.168.100.90:8012}
+        api-key: ${EMBEDDING_API_KEY:empty}
+        options:
+          model: ${EMBEDDING_MODEL_NAME:BAAI/bge-m3}
+          dimensions: ${EMBEDDING_EMBEDDING_DIM:1024}
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: ${EMBEDDING_EMBEDDING_DIM:1024}
+        initialize-schema: false
+        table-name: vector_store
+
+# MinerU 高精度多模态文档解析服务配置 (部署于内网 5090 服务器)
+mineru:
+  base-url: ${MINERU_BASE_URL:http://192.168.100.90:8010}
+  lang: ${MINERU_LANG:ch}
+  output-dir: ${MINERU_OUTPUT_DIR:/root/output}
+  enable-formula: ${MINERU_ENABLE_FORMULA:true}
+  enable-table: ${MINERU_ENABLE_TABLE:true}
+  backend: ${MINERU_BACKEND:pipeline}
+  return-images: ${MINERU_RETURN_IMAGES:false}
+  timeout: 180000
+
+# 日志输出级别
+logging:
+  level:
+    com.ragagent: DEBUG
+    org.springframework.ai: INFO
+    org.springframework.ai.chat.client.advisor: DEBUG
+    liquibase: INFO

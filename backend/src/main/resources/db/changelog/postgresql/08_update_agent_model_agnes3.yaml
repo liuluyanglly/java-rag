@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 08-update-agent-model-agnes3
+      author: antigravity
+      comment: "升级默认智能体大模型至 agnes-3.0-flash"
+      changes:
+        - sql:
+            comment: "更新默认智能体调用模型"
+            sql: |
+              UPDATE ai_agent SET model_name = 'agnes-3.0-flash' WHERE model_name LIKE '%agnes%' OR model_name = 'deepseek-chat';
+              ALTER TABLE ai_agent ALTER COLUMN model_name SET DEFAULT 'agnes-3.0-flash';
