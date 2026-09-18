@@ -529,6 +529,12 @@ public class ChatController {
                         }
                         promptWithContext.append("【当前用户问题】:\n").append(userMessage)
                                 .append("\n\n(请严格基于上述参考切片，按照【回答格式与美学排版规范】输出优雅美观、结构清晰的回答)");
+                    } else if (intent.getType() == ChatIntentType.KNOWLEDGE_QA) {
+                        promptWithContext.append("【企业知识库防幻觉规约】:\n")
+                                .append("当前企业知识库中未检索到与用户提问直接匹配的文档切片。\n")
+                                .append("请明确、诚恳地告知用户：“根据企业知识库当前收录的内容，未查询到相关明确记载。”\n")
+                                .append("严禁依据常识盲目编造虚假条款或数据，避免事实性幻觉。\n\n")
+                                .append("【当前用户问题】:\n").append(userMessage);
                     } else {
                         promptWithContext.append("【当前用户问题】:\n").append(userMessage);
                     }

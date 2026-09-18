@@ -71,4 +71,39 @@ public class SpringAi2IntegrationTest {
             System.out.println("  切片[" + (i + 1) + "]: " + chunks.get(i).getText());
         }
     }
+
+    @Test
+    public void testCustomerServiceTool() {
+        com.ragagent.agent.tools.CustomerServiceTool tool = new com.ragagent.agent.tools.CustomerServiceTool();
+        
+        // 1. 查询有效预订
+        String detail = tool.getBookingDetails(new com.ragagent.agent.tools.CustomerServiceTool.QueryBookingRequest("BK20260901", "张伟"));
+        assertNotNull(detail);
+        assertTrue(detail.contains("张伟"));
+        assertTrue(detail.contains("CA1832"));
+        System.out.println("预订查询结果: " + detail);
+
+        // 2. 身份不符校验
+        String mismatch = tool.getBookingDetails(new com.ragagent.agent.tools.CustomerServiceTool.QueryBookingRequest("BK20260901", "李雷"));
+        assertTrue(mismatch.contains("不匹配"));
+
+        // 3. 退订业务触发
+        String cancel = tool.cancelBooking(new com.ragagent.agent.tools.CustomerServiceTool.CancelBookingRequest("BK20260901", "张伟", "行程变更"));
+        assertTrue(cancel.contains("成功"));
+        System.out.println("退订申请结果: " + cancel);
+    }
+
+    @Test
+    public void testRagEvaluationServiceRuleFallback() {
+        com.ragagent.rag.service.RagEvaluationService service = new com.ragagent.rag.service.RagEvaluationService(null);
+        String query = "退票费用是多少？";
+        String context = "取消预订：经济舱取消费用为75美元。";
+        String response = "根据规定，经济舱退票需要支付75美元的手续费。";
+
+        com.ragagent.rag.service.RagEvaluationService.RagEvalResult result = service.evaluate(query, context, response);
+        assertNotNull(result);
+        assertTrue(result.isPass());
+        assertTrue(result.getTotalScore() >= 0.7);
+        System.out.println("RAG 评测结果: " + result);
+    }
 }
