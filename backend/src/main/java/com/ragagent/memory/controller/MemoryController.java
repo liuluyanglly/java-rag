@@ -97,8 +97,9 @@ public class MemoryController {
     public Result<List<AiAgentMemory>> listMemories(
             @Parameter(description = "记忆类型过滤，为空则返回全部类型", example = "PREFERENCE",
                     schema = @Schema(allowableValues = {"SEMANTIC", "EPISODIC", "PREFERENCE", "CORRECTION"}))
-            @RequestParam(name = "memoryType", required = false) String memoryType) {
-        Long userId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : 1L;
+            @RequestParam(name = "memoryType", required = false) String memoryType,
+            org.springframework.web.server.ServerWebExchange exchange) {
+        Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
         List<AiAgentMemory> list = longTermMemoryService.getUserMemories(userId, memoryType);
         return Result.success(list);
     }
@@ -110,16 +111,17 @@ public class MemoryController {
             @Parameter(description = "检索文本", example = "回答风格偏好", required = true)
             @RequestParam(name = "query") String query,
             @Parameter(description = "返回条数上限", example = "5")
-            @RequestParam(name = "topK", defaultValue = "5") int topK) {
-        Long userId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : 1L;
+            @RequestParam(name = "topK", defaultValue = "5") int topK,
+            org.springframework.web.server.ServerWebExchange exchange) {
+        Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
         List<AiAgentMemory> list = longTermMemoryService.searchMemories(userId, query, topK);
         return Result.success(list);
     }
 
     @Operation(summary = "手动添加长期记忆", description = "出参 data 为落库后的完整记忆条目")
     @PostMapping("/add")
-    public Result<AiAgentMemory> addMemory(@RequestBody MemoryCreateRequest req) {
-        Long userId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : 1L;
+    public Result<AiAgentMemory> addMemory(@RequestBody MemoryCreateRequest req, org.springframework.web.server.ServerWebExchange exchange) {
+        Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
         AiAgentMemory mem = longTermMemoryService.addMemory(
                 userId,
                 req.getAgentId(),
@@ -146,7 +148,8 @@ public class MemoryController {
     @DeleteMapping("/{id}")
     public Result<Boolean> deleteMemory(
             @Parameter(description = "记忆条目ID", example = "1838294857392746496", required = true)
-            @PathVariable String id) {
+            @PathVariable String id,
+            org.springframework.web.server.ServerWebExchange exchange) {
         boolean ok = longTermMemoryService.deleteMemory(id);
         return Result.success(ok);
     }
@@ -161,12 +164,12 @@ public class MemoryController {
         return Result.success(true);
     }
 
-    @Operation(summary = "用户反馈与纠错自省触发 (Reflexion 自进化)",
+    @Operation(summary = "提交用户反馈并触发反射演化",
             description = "rating 为负值时触发 Reflexion 归因诊断并沉淀防再犯规约，出参 data 为自省结果；"
                     + "正向反馈仅记录，data 返回 null")
     @PostMapping("/feedback")
-    public Result<ReflexionResult> submitFeedback(@RequestBody FeedbackRequest req) {
-        Long userId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : 1L;
+    public Result<ReflexionResult> submitFeedback(@RequestBody FeedbackRequest req, org.springframework.web.server.ServerWebExchange exchange) {
+        Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
         // 如果是负向反馈(点踩或有纠错批注)，触发 Reflexion 纠错反省并沉淀防再犯规约
         if (req.getRating() != null && req.getRating() < 0) {
             ReflexionResult reflexion = memoryEvolutionService.reflectAndEvolve(

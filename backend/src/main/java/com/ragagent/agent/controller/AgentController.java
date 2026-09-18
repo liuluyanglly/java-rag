@@ -1,18 +1,19 @@
 package com.ragagent.agent.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragagent.agent.entity.AiAgent;
 import com.ragagent.agent.mapper.AiAgentMapper;
 import com.ragagent.common.result.Result;
+import com.ragagent.common.security.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ServerWebExchange;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,7 +35,8 @@ public class AgentController {
             @Parameter(description = "每页条数", example = "10")
             @RequestParam(defaultValue = "10") Integer pageSize,
             @Parameter(description = "智能体名称，模糊匹配，为空则不过滤", example = "研发")
-            @RequestParam(required = false) String name) {
+            @RequestParam(required = false) String name,
+            ServerWebExchange exchange) {
 
         Page<AiAgent> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<AiAgent> wrapper = new LambdaQueryWrapper<>();
@@ -47,7 +49,7 @@ public class AgentController {
     @Operation(summary = "获取当前可见的可用智能体",
             description = "用户端助手广场使用，仅返回 status=0（正常启用）的智能体")
     @GetMapping("/active")
-    public Result<List<AiAgent>> getActiveAgents() {
+    public Result<List<AiAgent>> getActiveAgents(ServerWebExchange exchange) {
         return Result.success(agentMapper.selectList(new LambdaQueryWrapper<AiAgent>()
                 .eq(AiAgent::getStatus, "0")
                 .orderByDesc(AiAgent::getCreateTime)));
@@ -58,7 +60,8 @@ public class AgentController {
     @GetMapping("/{id}")
     public Result<AiAgent> getById(
             @Parameter(description = "智能体ID", example = "1", required = true)
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            ServerWebExchange exchange) {
         return Result.success(agentMapper.selectById(id));
     }
 
@@ -66,8 +69,8 @@ public class AgentController {
             description = "入参 id / createdBy / createTime / updateTime 由服务端生成，无需传入")
     @SaCheckPermission("ai:agent:add")
     @PostMapping
-    public Result<Void> add(@RequestBody AiAgent agent) {
-        Long userId = StpUtil.getLoginIdAsLong();
+    public Result<Void> add(@RequestBody AiAgent agent, ServerWebExchange exchange) {
+        Long userId = SecurityUtils.getLoginUserId(exchange);
         agent.setCreatedBy(userId);
         agent.setCreateTime(LocalDateTime.now());
         agent.setUpdateTime(LocalDateTime.now());
@@ -78,7 +81,7 @@ public class AgentController {
     @Operation(summary = "修改智能体", description = "按 id 更新智能体配置，未传字段保持原值")
     @SaCheckPermission("ai:agent:edit")
     @PutMapping
-    public Result<Void> edit(@RequestBody AiAgent agent) {
+    public Result<Void> edit(@RequestBody AiAgent agent, ServerWebExchange exchange) {
         agent.setUpdateTime(LocalDateTime.now());
         agentMapper.updateById(agent);
         return Result.success("智能体更新成功", null);
@@ -89,7 +92,8 @@ public class AgentController {
     @DeleteMapping("/{id}")
     public Result<Void> remove(
             @Parameter(description = "智能体ID", example = "1", required = true)
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            ServerWebExchange exchange) {
         agentMapper.deleteById(id);
         return Result.success("删除成功", null);
     }

@@ -1,10 +1,10 @@
 package com.ragagent.rag.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragagent.common.result.Result;
+import com.ragagent.common.security.SecurityUtils;
 import com.ragagent.rag.entity.AiDataset;
 import com.ragagent.rag.entity.AiDatasetRole;
 import com.ragagent.rag.mapper.AiDatasetMapper;
@@ -16,10 +16,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ServerWebExchange;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Tag(name = "知识库管理")
 @RestController
@@ -37,8 +37,9 @@ public class DatasetController {
     public Result<List<com.ragagent.rag.service.RagSearchService.SearchResultChunk>> hitTest(
             @PathVariable Long id,
             @RequestParam String query,
-            @RequestParam(defaultValue = "5") int topK) {
-        Long userId = StpUtil.getLoginIdAsLong();
+            @RequestParam(defaultValue = "5") int topK,
+            ServerWebExchange exchange) {
+        Long userId = SecurityUtils.getLoginUserId(exchange);
         List<com.ragagent.rag.service.RagSearchService.SearchResultChunk> results = 
                 ragSearchService.search(userId, query, List.of(id), topK);
         return Result.success(results);
@@ -54,7 +55,8 @@ public class DatasetController {
             @Parameter(description = "每页条数", example = "10")
             @RequestParam(defaultValue = "10") Integer pageSize,
             @Parameter(description = "知识库名称，模糊匹配，为空则不过滤", example = "研发规范")
-            @RequestParam(required = false) String name) {
+            @RequestParam(required = false) String name,
+            ServerWebExchange exchange) {
 
         Page<AiDataset> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<AiDataset> wrapper = new LambdaQueryWrapper<>();
@@ -68,8 +70,8 @@ public class DatasetController {
     @Operation(summary = "获取当前用户可访问的知识库列表",
             description = "用户端使用。按当前登录用户的角色白名单与安全密级过滤，仅返回有权检索的知识库")
     @GetMapping("/accessible")
-    public Result<List<AiDataset>> getAccessibleDatasets() {
-        Long userId = StpUtil.getLoginIdAsLong();
+    public Result<List<AiDataset>> getAccessibleDatasets(ServerWebExchange exchange) {
+        Long userId = SecurityUtils.getLoginUserId(exchange);
         return Result.success(datasetMapper.selectAccessibleDatasets(userId));
     }
 
@@ -79,8 +81,8 @@ public class DatasetController {
     @SaCheckPermission("ai:dataset:add")
     @PostMapping
     @Transactional(rollbackFor = Exception.class)
-    public Result<Void> add(@RequestBody AiDataset dataset) {
-        Long userId = StpUtil.getLoginIdAsLong();
+    public Result<Void> add(@RequestBody AiDataset dataset, ServerWebExchange exchange) {
+        Long userId = SecurityUtils.getLoginUserId(exchange);
         dataset.setCreatedBy(userId);
         dataset.setCreateTime(LocalDateTime.now());
         dataset.setUpdateTime(LocalDateTime.now());
@@ -104,7 +106,7 @@ public class DatasetController {
     @SaCheckPermission("ai:dataset:edit")
     @PutMapping
     @Transactional(rollbackFor = Exception.class)
-    public Result<Void> edit(@RequestBody AiDataset dataset) {
+    public Result<Void> edit(@RequestBody AiDataset dataset, ServerWebExchange exchange) {
         dataset.setUpdateTime(LocalDateTime.now());
         datasetMapper.updateById(dataset);
 
@@ -128,7 +130,8 @@ public class DatasetController {
     @Transactional(rollbackFor = Exception.class)
     public Result<Void> remove(
             @Parameter(description = "知识库ID", example = "1", required = true)
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            ServerWebExchange exchange) {
         datasetMapper.deleteById(id);
         datasetRoleMapper.delete(new LambdaQueryWrapper<AiDatasetRole>().eq(AiDatasetRole::getDatasetId, id));
         return Result.success("删除成功", null);

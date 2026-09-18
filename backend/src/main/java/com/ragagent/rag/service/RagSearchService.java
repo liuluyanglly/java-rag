@@ -55,14 +55,7 @@ public class RagSearchService {
      * @return 检索结果片段列表
      */
     public List<SearchResultChunk> search(String query, List<Long> targetDatasetIds, int topK) {
-        Long userId = 1L;
-        try {
-            if (StpUtil.isLogin()) {
-                userId = StpUtil.getLoginIdAsLong();
-            }
-        } catch (Exception e) {
-            log.debug("获取当前登录用户上下文失败，采用默认用户ID 1: {}", e.getMessage());
-        }
+        Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
         return search(userId, query, targetDatasetIds, topK);
     }
 

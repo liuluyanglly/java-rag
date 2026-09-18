@@ -96,16 +96,11 @@ public class ChatController {
         }
     }
 
-    @Operation(summary = "获取当前用户的对话会话列表",
+    @Operation(summary = "获取当前用户的所有会话列表",
             description = "置顶会话优先，其余按最后活跃时间倒序")
     @GetMapping("/sessions")
-    public Result<List<AiChatSession>> getSessions() {
-        Long userId = 1L;
-        try {
-            if (StpUtil.isLogin()) {
-                userId = StpUtil.getLoginIdAsLong();
-            }
-        } catch (Exception ignored) {}
+    public Result<List<AiChatSession>> getSessions(org.springframework.web.server.ServerWebExchange exchange) {
+        Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
         List<AiChatSession> sessions = sessionMapper.selectList(new LambdaQueryWrapper<AiChatSession>()
                 .eq(AiChatSession::getUserId, userId)
                 .orderByDesc(AiChatSession::getPinned)
@@ -118,13 +113,9 @@ public class ChatController {
     @PostMapping("/session")
     public Result<AiChatSession> createSession(
             @Parameter(description = "绑定的智能体ID，可为空", example = "1")
-            @RequestParam(name = "agentId", required = false) Long agentId) {
-        Long userId = 1L;
-        try {
-            if (StpUtil.isLogin()) {
-                userId = StpUtil.getLoginIdAsLong();
-            }
-        } catch (Exception ignored) {}
+            @RequestParam(name = "agentId", required = false) Long agentId,
+            org.springframework.web.server.ServerWebExchange exchange) {
+        Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
 
         // 检查当前用户最新的会话是否尚未产生任何消息，若是则直接复用，防止无限创建空会话
         List<AiChatSession> latestSessions = sessionMapper.selectList(new LambdaQueryWrapper<AiChatSession>()
@@ -175,13 +166,9 @@ public class ChatController {
     @DeleteMapping("/session/{sessionId}")
     public Result<Boolean> deleteSession(
             @Parameter(description = "会话UUID", example = "3f2a9c1b7e4d4a10", required = true)
-            @PathVariable String sessionId) {
-        Long userId = 1L;
-        try {
-            if (StpUtil.isLogin()) {
-                userId = StpUtil.getLoginIdAsLong();
-            }
-        } catch (Exception ignored) {}
+            @PathVariable String sessionId,
+            org.springframework.web.server.ServerWebExchange exchange) {
+        Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
 
         sessionMapper.delete(new LambdaQueryWrapper<AiChatSession>()
                 .eq(AiChatSession::getSessionId, sessionId)
@@ -319,13 +306,8 @@ public class ChatController {
             content = @Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE,
                     schema = @Schema(type = "string", description = "单个 SSE 事件的 data 载荷")))
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> chatStream(@RequestBody ChatRequest req) {
-        Long currentUserId = 1L;
-        try {
-            if (StpUtil.isLogin()) {
-                currentUserId = StpUtil.getLoginIdAsLong();
-            }
-        } catch (Exception ignored) {}
+    public Flux<ServerSentEvent<String>> chatStream(@RequestBody ChatRequest req, org.springframework.web.server.ServerWebExchange exchange) {
+        Long currentUserId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
         final Long userId = currentUserId;
         final String userMessage = req.getEffectiveMessage();
 

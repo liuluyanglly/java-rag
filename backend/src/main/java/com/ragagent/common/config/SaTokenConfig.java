@@ -2,6 +2,7 @@ package com.ragagent.common.config;
 
 import cn.dev33.satoken.reactor.context.SaReactorSyncHolder;
 import cn.dev33.satoken.reactor.filter.SaReactorFilter;
+import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.util.SaResult;
 import lombok.extern.slf4j.Slf4j;
@@ -13,23 +14,24 @@ import org.springframework.core.annotation.Order;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
-import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
-import org.springframework.web.server.WebFilterChain;
-import reactor.core.publisher.Mono;
 
 @Slf4j
 @Configuration
-public class SaTokenConfig implements WebFilter {
+public class SaTokenConfig {
 
     /**
-     * WebFlux 异步模式下注入 SaReactor 上下文，确保在 Controller 中调用 StpUtil 时上下文不为空
+     * WebFlux 全局上下文注入过滤器 (最高优先级)
+     * 在反应式流执行生命周期内保持 exchange 传递
      */
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        SaReactorSyncHolder.setContext(exchange);
-        return chain.filter(exchange)
-                .doFinally(signalType -> SaReactorSyncHolder.clearContext());
+    @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    public WebFilter saReactorContextWebFilter() {
+        return (exchange, chain) -> {
+            SaReactorSyncHolder.setContext(exchange);
+            return chain.filter(exchange)
+                    .doFinally(signalType -> SaReactorSyncHolder.clearContext());
+        };
     }
 
     @Bean
@@ -58,11 +60,11 @@ public class SaTokenConfig implements WebFilter {
         return new SaReactorFilter()
                 .addInclude("/api/**")
                 .addExclude(
-                        // 登录、验证码与公开认证
-                        "/api/auth/**",
+                        // 登录、注册、验证码等公开认证接口
                         "/api/auth/login",
+                        "/api/auth/register",
                         "/api/auth/captcha",
-                        // Scalar 现代化 API 在线接口文档与 OpenAPI 3 契约元数据
+                        // API 在线接口文档与 OpenAPI 契约
                         "/scalar",
                         "/docs",
                         "/doc.html",
@@ -73,8 +75,14 @@ public class SaTokenConfig implements WebFilter {
                         "/error",
                         "/actuator/**"
                 )
+                .setAuth(obj -> {
+                    // 对需要鉴权的路由进行登录校验
+                    SaRouter.match("/api/**")
+                            .notMatch("/api/auth/login", "/api/auth/register", "/api/auth/captcha")
+                            .check(r -> StpUtil.checkLogin());
+                })
                 .setError(e -> {
-                    log.warn("Sa-Token 鉴权异常拦截: {}", e.getMessage());
+                    log.warn("Sa-Token 鉴权拦截: {}", e.getMessage());
                     return SaResult.error("未登录或 Token 已失效: " + e.getMessage()).setCode(401);
                 });
     }
@@ -83,6 +91,7 @@ public class SaTokenConfig implements WebFilter {
      * WebFlux 跨域配置 (支持前端 Vite / React 跨域联调与 SSE 响应式流式长连接)
      */
     @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE - 1)
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration config = new CorsConfiguration();
         config.addAllowedOriginPattern("*");

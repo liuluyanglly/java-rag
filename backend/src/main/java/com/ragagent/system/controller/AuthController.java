@@ -2,6 +2,7 @@ package com.ragagent.system.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.ragagent.common.result.Result;
+import com.ragagent.common.security.SecurityUtils;
 import com.ragagent.system.entity.SysMenu;
 import com.ragagent.system.entity.SysRole;
 import com.ragagent.system.entity.SysUser;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ServerWebExchange;
 
 import java.util.HashMap;
 import java.util.List;
@@ -46,7 +48,7 @@ public class AuthController {
                     + "后续接口需将 token 放入该请求头。此接口无需鉴权。")
     @SecurityRequirements
     @PostMapping("/login")
-    public Result<Map<String, Object>> login(@RequestBody LoginBody body) {
+    public Result<Map<String, Object>> login(@RequestBody LoginBody body, ServerWebExchange exchange) {
         String token = sysUserService.login(body.getUsername(), body.getPassword());
         Map<String, Object> map = new HashMap<>();
         map.put("token", token);
@@ -57,8 +59,8 @@ public class AuthController {
     @Operation(summary = "获取当前用户信息及角色权限",
             description = "出参 data 为 Map：user-用户基本资料(SysUser)，roles-已授予角色列表(SysRole 数组)，permissions-权限码字符串数组")
     @GetMapping("/info")
-    public Result<Map<String, Object>> getInfo() {
-        Long userId = StpUtil.getLoginIdAsLong();
+    public Result<Map<String, Object>> getInfo(ServerWebExchange exchange) {
+        Long userId = SecurityUtils.getLoginUserId(exchange);
         SysUser user = sysUserService.getById(userId);
         List<SysRole> roles = sysRoleService.getRolesByUserId(userId);
         List<String> permissions = StpUtil.getPermissionList();
@@ -73,15 +75,15 @@ public class AuthController {
     @Operation(summary = "获取当前用户动态路由菜单",
             description = "按当前用户角色过滤后的菜单树，children 字段递归嵌套子菜单")
     @GetMapping("/routers")
-    public Result<List<SysMenu>> getRouters() {
-        Long userId = StpUtil.getLoginIdAsLong();
+    public Result<List<SysMenu>> getRouters(ServerWebExchange exchange) {
+        Long userId = SecurityUtils.getLoginUserId(exchange);
         List<SysMenu> menuTree = sysMenuService.getMenuTreeByUserId(userId);
         return Result.success(menuTree);
     }
 
     @Operation(summary = "退出登录")
     @PostMapping("/logout")
-    public Result<Void> logout() {
+    public Result<Void> logout(ServerWebExchange exchange) {
         StpUtil.logout();
         return Result.success("退出成功", null);
     }

@@ -1,13 +1,15 @@
 package com.ragagent.rag.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.io.FileUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragagent.common.result.Result;
+import com.ragagent.common.security.SecurityUtils;
+import com.ragagent.rag.entity.AiDataset;
 import com.ragagent.rag.entity.AiDocument;
 import com.ragagent.rag.entity.AiDocumentChunk;
+import com.ragagent.rag.mapper.AiDatasetMapper;
 import com.ragagent.rag.mapper.AiDocumentChunkMapper;
 import com.ragagent.rag.mapper.AiDocumentMapper;
 import com.ragagent.rag.service.RagIndexingService;
@@ -20,16 +22,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.http.codec.multipart.FilePart;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import com.ragagent.rag.mapper.AiDatasetMapper;
-import com.ragagent.rag.entity.AiDataset;
-
 import java.io.File;
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -57,7 +56,8 @@ public class DocumentController {
             @Parameter(description = "页码，从 1 开始", example = "1")
             @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页条数", example = "10")
-            @RequestParam(defaultValue = "10") Integer pageSize) {
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            ServerWebExchange exchange) {
 
         Page<AiDocument> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<AiDocument> wrapper = new LambdaQueryWrapper<AiDocument>()
@@ -81,7 +81,8 @@ public class DocumentController {
             @Parameter(description = "归属知识库ID", example = "1", required = true)
             @RequestParam("datasetId") Long datasetId,
             @Parameter(hidden = true)
-            @RequestPart("file") FilePart filePart) {
+            @RequestPart("file") FilePart filePart,
+            ServerWebExchange exchange) {
 
         String originalFilename = filePart.filename();
         String ext = FileUtil.extName(originalFilename);
@@ -93,13 +94,7 @@ public class DocumentController {
         String saveFileName = UUID.randomUUID().toString().replace("-", "") + "." + ext;
         File targetFile = new File(dir, saveFileName);
 
-        Long userId;
-        try {
-            userId = StpUtil.getLoginIdAsLong();
-        } catch (Exception e) {
-            userId = 1L;
-        }
-        final Long currentUserId = userId;
+        final Long currentUserId = SecurityUtils.getLoginUserId(exchange);
 
         return filePart.transferTo(targetFile.toPath())
                 .then(Mono.fromCallable(() -> {
@@ -132,7 +127,8 @@ public class DocumentController {
             @Parameter(description = "页码，从 1 开始", example = "1")
             @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页条数", example = "10")
-            @RequestParam(defaultValue = "10") Integer pageSize) {
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            ServerWebExchange exchange) {
 
         Page<AiDocumentChunk> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<AiDocumentChunk> wrapper = new LambdaQueryWrapper<AiDocumentChunk>()
@@ -147,7 +143,8 @@ public class DocumentController {
     @PostMapping("/{id}/reindex")
     public Result<Void> reindex(
             @Parameter(description = "文档ID", example = "1", required = true)
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            ServerWebExchange exchange) {
         indexingService.indexDocumentAsync(id);
         return Result.success("已提交重新切片任务", null);
     }
@@ -157,7 +154,8 @@ public class DocumentController {
     @DeleteMapping("/{id}")
     public Result<Void> delete(
             @Parameter(description = "文档ID", example = "1", required = true)
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            ServerWebExchange exchange) {
         AiDocument doc = documentMapper.selectById(id);
         if (doc != null) {
             Long datasetId = doc.getDatasetId();
