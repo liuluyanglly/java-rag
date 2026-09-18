@@ -106,4 +106,52 @@ public class SpringAi2IntegrationTest {
         assertTrue(result.getTotalScore() >= 0.7);
         System.out.println("RAG 评测结果: " + result);
     }
+
+    @Test
+    public void testAgentEnvironmentAndTodoTracker() {
+        // 1. 测试环境自动感知
+        com.ragagent.agent.tools.AgentEnvironment env = new com.ragagent.agent.tools.AgentEnvironment();
+        String envCtx = env.getEnvironmentContext();
+        assertNotNull(envCtx);
+        assertTrue(envCtx.contains("系统运行时环境"));
+        assertTrue(envCtx.contains("操作系统"));
+        System.out.println("环境感知输出:\n" + envCtx);
+
+        // 2. 测试任务清单追踪器 (借鉴 Spring-AI-Agent-Utils)
+        com.ragagent.agent.tools.TodoTrackerTool tracker = new com.ragagent.agent.tools.TodoTrackerTool();
+        var task1 = tracker.addTask("session-101", "设计API", "设计用户认证接口");
+        assertNotNull(task1);
+        assertEquals(1, task1.getId());
+        assertEquals(com.ragagent.agent.tools.TodoTrackerTool.TaskStatus.PENDING, task1.getStatus());
+
+        String updateRes = tracker.updateTaskStatus("session-101", 1, "COMPLETED");
+        assertTrue(updateRes.contains("COMPLETED"));
+
+        var list = tracker.listTasks("session-101");
+        assertEquals(1, list.size());
+        assertEquals(com.ragagent.agent.tools.TodoTrackerTool.TaskStatus.COMPLETED, list.get(0).getStatus());
+        System.out.println("TodoTracker 追踪任务清单: " + list);
+    }
+
+    @Test
+    public void testAiObservabilityService() {
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        // 模拟记录一次 ChatClient 操作
+        registry.timer("spring.ai.chat.client.operation").record(java.time.Duration.ofMillis(850));
+        // 模拟记录 Token 消耗
+        registry.counter("gen_ai.client.token.usage", "gen_ai.token.type", "input").increment(350);
+        registry.counter("gen_ai.client.token.usage", "gen_ai.token.type", "output").increment(150);
+
+        com.ragagent.common.observability.AiObservabilityService obs = new com.ragagent.common.observability.AiObservabilityService(registry);
+        var summary = obs.getMetricsSummary();
+
+        assertNotNull(summary);
+        assertEquals(1, summary.getChatClientCalls());
+        assertEquals(350, summary.getInputTokens());
+        assertEquals(150, summary.getOutputTokens());
+        assertEquals(500, summary.getTotalTokens());
+        assertTrue(summary.getEstimatedCostRmb() > 0);
+        System.out.println("AI 可观测性度量汇总: " + summary);
+    }
 }
+

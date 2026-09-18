@@ -7,6 +7,9 @@ server:
   port: 8888
 
 spring:
+  threads:
+    virtual:
+      enabled: true # 开启虚拟线程，赋能 Agent 多路并发与高吞吐 RAG
   # 数据源配置 (PostgreSQL 16 + pgvector，参考 kumhosunny-admin-basic 配置标准)
   datasource:
     driver-class-name: org.postgresql.Driver
@@ -77,3 +80,22 @@ logging:
     org.springframework.ai: INFO
     org.springframework.ai.chat.client.advisor: DEBUG
     liquibase: INFO
+
+# Spring AI 2.0 实时监控与度量端点暴露 (支持 Prometheus & Micrometer)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"             # 暴露 health, metrics, prometheus, info 等
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: java-rag
+
