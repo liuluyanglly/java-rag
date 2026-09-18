@@ -63,7 +63,7 @@ public class AuthController {
         Long userId = SecurityUtils.getLoginUserId(exchange);
         SysUser user = sysUserService.getById(userId);
         List<SysRole> roles = sysRoleService.getRolesByUserId(userId);
-        List<String> permissions = StpUtil.getPermissionList();
+        List<String> permissions = SecurityUtils.getPermissionList(userId);
 
         Map<String, Object> data = new HashMap<>();
         data.put("user", user);

@@ -422,18 +422,16 @@ export const ChatPage: React.FC = () => {
             </Popconfirm>
           )}
 
-          {/* 右上角管理台快捷入口标志 */}
-          {isAdmin && (
-            <Tooltip title="打开管理控制台 (知识库中枢、对话记录管理、系统权限)">
-              <button
-                onClick={() => navigate('/admin/dataset')}
-                className="border border-slate-200/80 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200 text-slate-700 hover:text-indigo-600 font-semibold px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs transition-all cursor-pointer shadow-2xs"
-              >
-                <DashboardOutlined className="text-indigo-600 text-sm" />
-                <span>管理台</span>
-              </button>
-            </Tooltip>
-          )}
+          {/* 右上角管理控制台快捷入口标志 (常驻展示，支持一键直达知识库中枢、对话记录与审计) */}
+          <Tooltip title="进入管理控制台 (知识库中枢、对话记录与审计、智能体管理)">
+            <button
+              onClick={() => navigate('/admin/dataset')}
+              className="border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 hover:border-indigo-300 text-indigo-700 hover:text-indigo-900 font-bold px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs transition-all cursor-pointer shadow-xs"
+            >
+              <DashboardOutlined className="text-indigo-600 text-sm" />
+              <span>管理台</span>
+            </button>
+          </Tooltip>
         </div>
       </div>
 

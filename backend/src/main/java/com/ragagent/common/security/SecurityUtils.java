@@ -30,15 +30,16 @@ public class SecurityUtils {
     }
 
     /**
-     * 传入 ServerWebExchange 获取登录用户 ID (最强防御，直接利用当前 exchange)
+     * 传入 ServerWebExchange 获取登录用户 ID (直接利用当前 exchange 确保上下文就绪)
+     * 注意：不可在此提前 clearContext()，必须保留至当前 Controller 请求执行完毕由切面统一清理。
      */
     public static Long getLoginUserId(ServerWebExchange exchange) {
         if (exchange != null) {
             SaReactorSyncHolder.setContext(exchange);
             try {
                 return StpUtil.getLoginIdAsLong();
-            } finally {
-                SaReactorSyncHolder.clearContext();
+            } catch (Exception e) {
+                log.warn("从 ServerWebExchange 解析 loginId 异常: {}", e.getMessage());
             }
         }
         return getLoginUserId();
@@ -59,6 +60,16 @@ public class SecurityUtils {
     }
 
     /**
+     * 传入 ServerWebExchange 获取登录用户 ID，若未登录返回默认值
+     */
+    public static Long getLoginUserIdOrDefault(ServerWebExchange exchange, Long defaultUserId) {
+        if (exchange != null) {
+            SaReactorSyncHolder.setContext(exchange);
+        }
+        return getLoginUserIdOrDefault(defaultUserId);
+    }
+
+    /**
      * 判断当前会话是否登录
      */
     public static boolean isLogin() {
@@ -67,6 +78,20 @@ public class SecurityUtils {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /**
+     * 按指定用户ID获取权限码列表 (显式传参，绝不依赖 ThreadLocal 隐式推断)
+     */
+    public static List<String> getPermissionList(Object loginId) {
+        try {
+            if (loginId != null) {
+                return StpUtil.getPermissionList(loginId);
+            }
+        } catch (Exception e) {
+            log.warn("获取用户 [{}] 权限码异常: {}", loginId, e.getMessage());
+        }
+        return Collections.emptyList();
     }
 
     /**

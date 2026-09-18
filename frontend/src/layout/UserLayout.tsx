@@ -134,18 +134,16 @@ export const UserLayout: React.FC = () => {
       <div className="h-[1px] bg-slate-100 my-1" />
 
       <div className="space-y-0.5 text-xs">
-        {isAdmin && (
-          <div
-            onClick={() => {
-              setUserMenuOpen(false);
-              navigate('/admin/dataset');
-            }}
-            className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer text-indigo-600 font-medium transition-colors"
-          >
-            <SettingOutlined />
-            <span>进入管理控制台</span>
-          </div>
-        )}
+        <div
+          onClick={() => {
+            setUserMenuOpen(false);
+            navigate('/admin/dataset');
+          }}
+          className="flex items-center gap-2 p-2 rounded-lg hover:bg-indigo-50/80 cursor-pointer text-indigo-600 font-medium transition-colors"
+        >
+          <SettingOutlined />
+          <span>进入管理控制台</span>
+        </div>
 
         <div
           onClick={() => {
