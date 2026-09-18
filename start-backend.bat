@@ -24,8 +24,13 @@ echo [2/3] 验证 JDK 21 环境...
 echo [3/3] 正在启动后端 Spring Boot 4.0.0 (Netty WebFlux)...
 cd /d "%~dp0"
 
+set "JAR_PATH=backend\rag-agent-server\target\rag-agent-server-1.0.0.jar"
+if not exist "%JAR_PATH%" (
+    set "JAR_PATH=backend\target\java-rag-agent-backend-1.0.0.jar"
+)
+
 "%JAVA_HOME%\bin\java.exe" ^
-  -jar "backend\target\java-rag-agent-backend-1.0.0.jar" ^
+  -jar "%JAR_PATH%" ^
   --spring.profiles.active=dev
 
 pause

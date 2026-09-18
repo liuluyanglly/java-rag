@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.ragagent</groupId>
+        <artifactId>java-rag-agent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>rag-agent-workflow</artifactId>
+    <name>rag-agent-workflow</name>
+    <description>StateGraph Multi-Agent Workflow, Deep Research Workshop and Nodes Pipeline</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.ragagent</groupId>
+            <artifactId>rag-agent-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ragagent</groupId>
+            <artifactId>rag-agent-knowledge</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ragagent</groupId>
+            <artifactId>rag-agent-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+
+        <!-- Spring AI Alibaba Graph 状态机引擎 -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-graph-core</artifactId>
+        </dependency>
+    </dependencies>
+</project>
