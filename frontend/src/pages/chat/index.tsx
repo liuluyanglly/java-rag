@@ -53,7 +53,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 
 const { TextArea } = Input;
 
-// 扣子 (Coze) 科技风高颜值 AI 矢量头像徽章
+// 现代极简双星闪耀 (Sparkles) 高颜值 AI 矢量头像徽章
 const AiAvatarBadge: React.FC<{ avatarUrl?: string; name?: string; pulse?: boolean }> = ({
   avatarUrl,
   name,
@@ -64,7 +64,7 @@ const AiAvatarBadge: React.FC<{ avatarUrl?: string; name?: string; pulse?: boole
       <img
         src={avatarUrl}
         alt={name || 'AI'}
-        className={`w-7 h-7 rounded-xl object-cover shadow-xs border border-indigo-200 select-none ${
+        className={`w-7 h-7 rounded-xl object-cover shadow-xs border border-slate-200 select-none ${
           pulse ? 'animate-pulse' : ''
         }`}
       />
@@ -73,25 +73,26 @@ const AiAvatarBadge: React.FC<{ avatarUrl?: string; name?: string; pulse?: boole
 
   return (
     <div
-      className={`w-7 h-7 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 text-white flex items-center justify-center shadow-xs select-none ring-1.5 ring-indigo-200 shrink-0 ${
-        pulse ? 'animate-pulse' : ''
+      className={`w-7 h-7 rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-800 text-white flex items-center justify-center shadow-xs select-none border border-slate-700/80 shrink-0 ${
+        pulse ? 'animate-pulse ring-2 ring-indigo-400/40' : ''
       }`}
-      title={name || 'AI 智能体'}
+      title={name || 'AI'}
     >
+      {/* 现代双星闪耀 (Sparkles) 纯净矢量图标 */}
       <svg
         viewBox="0 0 24 24"
         fill="currentColor"
-        className="w-4 h-4 text-white"
+        className="w-3.5 h-3.5 text-indigo-300"
       >
-        <path d="M12 2a2 2 0 0 1 2 2v1h1a4 4 0 0 1 4 4v7a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9a4 4 0 0 1 4-4h1V4a2 2 0 0 1 2-2zM9 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-5 5a1 1 0 0 0 0 2h4a1 1 0 1 0 0-2h-4z" />
+        <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
       </svg>
     </div>
   );
 };
 
-// 精致圆形渐变用户头像徽章
+// 高级极简纯黑底用户头像徽章
 const UserAvatarBadge: React.FC<{ char: string }> = ({ char }) => (
-  <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 to-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs select-none ring-1.5 ring-indigo-200 shrink-0">
+  <div className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-xs select-none border border-slate-800 shrink-0">
     {char}
   </div>
 );
@@ -272,15 +273,16 @@ export const ChatPage: React.FC = () => {
     };
     setMessages((prev) => [...prev, userMsg]);
     setGenerating(true);
-    setCurrentThought('');
+    setCurrentThought('🧠 正在理解提问语义，激活深度思考与意图推理回路...\n');
     setCurrentCitations([]);
     setCurrentMemories([]);
     setStreamingContent('');
     setThoughtExpanded((prev) => ({ ...prev, live: true }));
     scrollToBottom();
 
+    let fullRawText = '';
     let fullText = '';
-    let thoughtText = '';
+    let thoughtText = '🧠 正在理解提问语义，激活深度思考与意图推理回路...\n';
     let citationsArr: CitationItem[] = [];
     let memoriesArr: AgentMemoryItem[] = [];
 
@@ -316,7 +318,27 @@ export const ChatPage: React.FC = () => {
           setCurrentMemories(memories);
         },
         onMessage: (token) => {
-          fullText += token;
+          fullRawText += token;
+          // 支持自动识别与实时抽离模型原生的 <think>...</think> 思考链
+          if (fullRawText.includes('<think>')) {
+            const thinkEndIdx = fullRawText.indexOf('</think>');
+            if (thinkEndIdx !== -1) {
+              const modelThought = fullRawText.slice(fullRawText.indexOf('<think>') + 7, thinkEndIdx).trim();
+              if (modelThought && !thoughtText.includes(modelThought)) {
+                thoughtText += (thoughtText.endsWith('\n') ? '' : '\n') + modelThought + '\n';
+                setCurrentThought(thoughtText);
+              }
+              fullText = fullRawText.slice(thinkEndIdx + 8).trimStart();
+            } else {
+              // 还在思考中
+              const liveThink = fullRawText.slice(fullRawText.indexOf('<think>') + 7);
+              setCurrentThought(thoughtText + '\n' + liveThink);
+              fullText = '';
+            }
+          } else {
+            fullText = fullRawText;
+          }
+
           setStreamingContent(fullText);
           scrollToBottom();
         },
@@ -333,7 +355,7 @@ export const ChatPage: React.FC = () => {
             ...prev,
             {
               ...finalMsg,
-              content: fullText,
+              content: fullText || fullRawText,
               thought: finalMsg?.thought || thoughtText,
               citations: citationsArr.length > 0 ? JSON.stringify(citationsArr) : (finalMsg?.citations || '[]'),
               memories: memoriesArr.length > 0 ? JSON.stringify(memoriesArr) : (finalMsg?.memories || '[]'),
@@ -441,17 +463,6 @@ export const ChatPage: React.FC = () => {
               </button>
             </Popconfirm>
           )}
-
-          {/* 右上角管理控制台快捷入口标志 (常驻展示，支持一键直达知识库中枢、对话记录与审计) */}
-          <Tooltip title="进入管理控制台 (知识库中枢、对话记录与审计、智能体管理)">
-            <button
-              onClick={() => navigate('/admin/dataset')}
-              className="border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 hover:border-indigo-300 text-indigo-700 hover:text-indigo-900 font-bold px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs transition-all cursor-pointer shadow-xs"
-            >
-              <DashboardOutlined className="text-indigo-600 text-sm" />
-              <span>管理台</span>
-            </button>
-          </Tooltip>
         </div>
       </div>
 
@@ -487,8 +498,8 @@ export const ChatPage: React.FC = () => {
               <span>探讨什么？</span>
             </h1>
 
-            {/* 核心输入卡片 (边框清晰明显、轻微阴影、聚焦状态蓝色光晕反馈) */}
-            <div className="w-full rounded-2xl border border-slate-300/90 bg-white/95 backdrop-blur-xl p-3.5 shadow-sm hover:border-indigo-400 focus-within:border-indigo-500 focus-within:ring-3 focus-within:ring-indigo-100/80 transition-all">
+            {/* 核心输入卡片 (边框加深对比明显、轻微立体阴影、聚焦状态蓝色光晕反馈) */}
+            <div className="w-full rounded-2xl border border-slate-400/80 bg-white/95 backdrop-blur-xl p-3.5 shadow-sm hover:border-slate-500 focus-within:border-indigo-500 focus-within:ring-3 focus-within:ring-indigo-100/80 transition-all">
               <TextArea
                 ref={inputRef}
                 value={inputMessage}
@@ -637,13 +648,6 @@ export const ChatPage: React.FC = () => {
                 <span className="font-bold text-xs text-slate-900 leading-none">
                   {isUser ? userName : (currentAgent?.name || '智能助手')}
                 </span>
-
-                {/* AI 专属绿色轻量徽章 */}
-                {!isUser && (
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold leading-none">
-                    AI 智能体
-                  </span>
-                )}
 
                 {/* 生成时间 */}
                 {m.createTime && (
@@ -804,7 +808,7 @@ export const ChatPage: React.FC = () => {
       {/* 对话进行中的底部输入框：浮动悬浮吸底卡片，与对话区无缝融合重叠 */}
       {messages.length > 0 && (
         <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-8 md:px-16 pb-5 pt-8 pointer-events-none bg-gradient-to-t from-white via-white/90 to-transparent z-10 flex justify-center">
-          <div className="max-w-3xl w-full pointer-events-auto rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-md p-3 shadow-lg hover:border-slate-300 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+          <div className="max-w-3xl w-full pointer-events-auto rounded-2xl border border-slate-300 bg-white/95 backdrop-blur-md p-3 shadow-lg hover:border-slate-400 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
             <TextArea
               ref={inputRef}
               value={inputMessage}

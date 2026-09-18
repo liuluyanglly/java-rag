@@ -54,6 +54,12 @@ spring:
         options:
           model: ${EMBEDDING_MODEL_NAME:BAAI/bge-m3}
           dimensions: ${EMBEDDING_EMBEDDING_DIM:1024}
+      mcp:
+        server:
+          # Spring AI 2.0 官方规范：全面弃用 Legacy HTTP+SSE，采用 Streamable HTTP 单端点协议
+          protocol: STREAMABLE
+          name: java-rag-agent-mcp
+          version: 2.0.0
     vectorstore:
       pgvector:
         index-type: HNSW

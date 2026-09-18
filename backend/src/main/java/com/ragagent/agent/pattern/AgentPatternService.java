@@ -60,6 +60,18 @@ public class AgentPatternService {
     // 适用场景：长难任务分解为清晰的顺序步骤，用延迟换取高准确度
     // =========================================================================
 
+    /**
+     * <h3>模式一：Chain 链式流水线工作流 (Prompt Chaining)</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * <ul>
+     *   <li><b>设计思想：</b> 分而治之（Divide and Conquer）。单次 Prompt 要求模型完成“架构规划+代码撰写+Markdown格式化”容易顾此失彼。拆分为多段串行管道，前一步的输出作为后一步的确定输入，大幅提升准确率。</li>
+     *   <li><b>流水线三阶段：</b> 提炼大纲（步骤1） -> 详细内容扩展（步骤2） -> GFM 格式标准化与语言润色（步骤3）。</li>
+     * </ul>
+     *
+     * @param requirement 用户的初始复杂需求描述
+     * @return 最终产出结果与各阶段中间处理摘要记录
+     */
     public ChainResult runChainPattern(String requirement) {
         ChatClient client = chatClientBuilder.build();
         List<String> steps = new ArrayList<>();
@@ -86,6 +98,19 @@ public class AgentPatternService {
     // 模式二：Parallelization 并行化 (分段/投票 + 聚合)
     // ==========================================
 
+    /**
+     * <h3>模式二：Parallelization 多专家并行分析与综合决策模式</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * <ul>
+     *   <li><b>高吞吐并发：</b> 利用 Java 21 虚拟线程池 ({@code Executors.newVirtualThreadPerTaskExecutor()})，并发发起多个 LLM 请求，耗时取决于最慢的一个视角，而非串行耗时总和。</li>
+     *   <li><b>聚合器 (Aggregator)：</b> 汇聚安全架构师、算法科学家、商业战略等多个维度的独立分析，由 Aggregator 提炼共识、揭示潜在冲突风险。</li>
+     * </ul>
+     *
+     * @param topic        待研判的核心主题或方案
+     * @param perspectives 参与评审的专家视角维度列表（如：["安全架构", "性能与高并发", "成本与运维"]）
+     * @return 综合各专家维度的最终研判报告
+     */
     public ParallelResult runParallelPattern(String topic, List<String> perspectives) {
         ChatClient client = chatClientBuilder.build();
         // 采用 Java 21 虚拟线程执行器提升高并发吞吐
@@ -128,10 +153,22 @@ public class AgentPatternService {
     // 模式三：Routing 路由模式 (意图分类分发)
     // ==========================================
 
+    /**
+     * <h3>模式三：Routing 意图路由分发模式</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * <ul>
+     *   <li><b>为什么需要 Router？</b> 不同的业务请求对系统资源的要求差异极大。通用闲聊直接调用大模型，技术制度问答调用 RAG 检索知识库，工单/订单操作则挂载 Function Calling（Tools）。</li>
+     *   <li><b>架构优势：</b> 将单一庞大混乱的系统 Prompt 拆解为针对特定场景的专业 Agent，提高回答精度并节省无关上下文的 Token 消耗。</li>
+     * </ul>
+     *
+     * @param userQuery 用户输入的原始问题或业务请求
+     * @return 路由决策与对应分支执行结果
+     */
     public RoutingResult runRoutingPattern(String userQuery) {
         ChatClient client = chatClientBuilder.build();
 
-        // 1. 分类识别
+        // 步骤 1：意图分类识别（LLM 作为轻量级分类网关）
         String classifyPrompt = String.format("""
                 请对用户的提问意图进行精确分类，仅输出以下三个类别关键字之一，不要包含任何其他标点或废话：
                 - KNOWLEDGE_QA (涉及知识库、规章制度、技术规范、产品说明等查询)
@@ -147,11 +184,14 @@ public class AgentPatternService {
         String executionResult;
         String executionPath;
 
+        // 步骤 2：依据路由决策分流至专属管道
         if (route.contains("CUSTOMER_SERVICE")) {
+            // 分支 A：业务工具调用分支（挂载 Tools / Function Calling）
             executionPath = "企业工单与业务办理分支 (Tools 工具调用)";
             ChatClient toolClient = chatClientBuilder.defaultTools(customerServiceTool).build();
             executionResult = toolClient.prompt(userQuery).call().content();
         } else if (route.contains("KNOWLEDGE_QA")) {
+            // 分支 B：知识库检索增强分支（RAG 检索）
             executionPath = "知识库问答分支 (RAG 检索增强)";
             var docs = ragSearchService.search(userQuery, null, 3);
             if (docs.isEmpty()) {
@@ -163,6 +203,7 @@ public class AgentPatternService {
                         .call().content();
             }
         } else {
+            // 分支 C：通用直接问答分支
             executionPath = "通用大模型对话分支 (Direct LLM)";
             executionResult = client.prompt(userQuery).call().content();
         }
@@ -174,10 +215,22 @@ public class AgentPatternService {
     // 模式四：Orchestrator-Workers 编排器-工作者 (动态拆分+合成)
     // ==========================================
 
+    /**
+     * <h3>模式四：Orchestrator-Workers 编排器-多工作者模式 (动态规划与并发交付)</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * <ul>
+     *   <li><b>动态多智能体规划：</b> 区别于固定的 Chain 模式，Orchestrator 能够根据宏观任务的复杂度和性质，动态决定分解出哪些角色（如：前端专家、DBA、后端架构师）及对应的独立子任务指令。</li>
+     *   <li><b>并发交付与合成：</b> 虚拟线程池并行驱动多个 Worker 协同生成各自负责的交付成果，最终由主编排器统一融合成最终完整方案。</li>
+     * </ul>
+     *
+     * @param macroTask 宏观复杂任务（例如：“设计高并发电商秒杀系统全链路架构方案”）
+     * @return 编排规划分析、各工作者产出及最终合成交付成果
+     */
     public OrchestrationResult runOrchestratorPattern(String macroTask) {
         ChatClient client = chatClientBuilder.build();
 
-        // 1. 编排器分析任务并动态拆解
+        // 1. 编排器分析任务并动态拆解为结构化 JSON 计划
         String orchestratorPrompt = String.format("""
                 你是一名资深系统架构与项目编排专家。请将以下宏观任务分解为 2 到 4 个高内聚、低耦合且可独立执行的子任务。
                 任务说明: %s
@@ -200,7 +253,7 @@ public class AgentPatternService {
             return new OrchestrationResult(macroTask, "编排拆分降级", List.of(), client.prompt(macroTask).call().content());
         }
 
-        // 2. 工作者并行处理各自子任务
+        // 2. 虚拟线程并发调度各专业 Worker 处理子任务
         ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         try {
             List<CompletableFuture<WorkerDeliverable>> futures = plan.getSubTasks().stream()
@@ -244,6 +297,19 @@ public class AgentPatternService {
     // 模式五：Evaluator-Optimizer 评估器-优化器循环
     // ==========================================
 
+    /**
+     * <h3>模式五：Evaluator-Optimizer 评估器-优化器自我迭代闭环</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * <ul>
+     *   <li><b>对抗式自省演进：</b> 类似 GAN（生成对抗网络）思想。一个 Agent 专门作为<b>生成者 (Generator)</b> 负责产出解决方案，另一个 Agent 扮演苛刻的<b>评审专家 (Evaluator)</b> 进行打分和挑刺。</li>
+     *   <li><b>吸收反馈重构：</b> 只要未通过（{@code passed=false}），便将评审反馈作为上下文，驱动模型生成新版本方案，最多循环迭代指定轮次，实现质量的螺旋上升。</li>
+     * </ul>
+     *
+     * @param task          待求解或优化的技术方案任务
+     * @param maxIterations 最大迭代轮次上限 (建议 1~3 轮，避免 Token 消耗过大)
+     * @return 最终达成标准的方案以及各轮次的迭代演化历史
+     */
     public EvaluatorOptimizerResult runEvaluatorOptimizerPattern(String task, int maxIterations) {
         ChatClient client = chatClientBuilder.build();
         int maxRounds = (maxIterations <= 0 || maxIterations > 3) ? 3 : maxIterations;

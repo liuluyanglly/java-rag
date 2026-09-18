@@ -285,11 +285,9 @@ export const UserLayout: React.FC = () => {
                             : 'text-slate-700 font-medium hover:bg-slate-200/60 hover:text-slate-900'
                         }`}
                       >
-                        {/* 编号与标题 */}
+                        {/* 标题 */}
                         <div className="flex items-center gap-2 min-w-0 flex-1 mr-1">
-                          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-200 text-slate-800 font-bold shrink-0">
-                            #{sessionNumber}
-                          </span>
+                          <MessageOutlined className="text-slate-400 text-xs shrink-0" />
                           <Tooltip title={s.title || '新对话'}>
                             <span className="truncate">{s.title || '新对话'}</span>
                           </Tooltip>

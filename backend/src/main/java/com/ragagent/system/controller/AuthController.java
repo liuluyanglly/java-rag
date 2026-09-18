@@ -1,5 +1,6 @@
 package com.ragagent.system.controller;
 
+import cn.dev33.satoken.reactor.context.SaReactorSyncHolder;
 import cn.dev33.satoken.stp.StpUtil;
 import com.ragagent.common.result.Result;
 import com.ragagent.common.security.SecurityUtils;
@@ -84,7 +85,15 @@ public class AuthController {
     @Operation(summary = "退出登录")
     @PostMapping("/logout")
     public Result<Void> logout(ServerWebExchange exchange) {
-        StpUtil.logout();
+        if (exchange != null) {
+            SaReactorSyncHolder.setContext(exchange);
+        }
+        try {
+            StpUtil.logout();
+        } catch (Exception ignored) {
+        } finally {
+            SaReactorSyncHolder.clearContext();
+        }
         return Result.success("退出成功", null);
     }
 }

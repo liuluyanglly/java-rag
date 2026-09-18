@@ -47,4 +47,16 @@ public class AiChatSession implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "该会话最后一次交互活跃时间，列表按此倒序", example = "2026-09-16 14:47:05")
     private LocalDateTime updateTime;
+
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    @Schema(description = "该会话累计消息条数")
+    private Integer messageCount;
+
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    @Schema(description = "最近一次用户提问内容")
+    private String lastUserMessage;
+
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    @Schema(description = "最近一次智能体回复内容")
+    private String lastAssistantMessage;
 }

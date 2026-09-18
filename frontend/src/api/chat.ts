@@ -9,6 +9,9 @@ export interface ChatSessionItem {
   pinned: boolean;
   createTime: string;
   updateTime: string;
+  messageCount?: number;
+  lastUserMessage?: string;
+  lastAssistantMessage?: string;
 }
 
 export interface CitationItem {
@@ -107,7 +110,23 @@ export const submitFeedbackApi = (data: FeedbackRequest) => {
 };
 
 /**
- * 启动 SSE 流式对话请求
+ * <h3>启动 SSE (Server-Sent Events) 流式对话请求客户端</h3>
+ * <p>
+ * <b>学习核心知识点：</b>
+ * <ol>
+ *   <li><b>为什么不用浏览器原生的 EventSource？</b>
+ *       <br>标准浏览器的 {@code EventSource} API 仅支持 HTTP GET 请求且无法在 Header 中直接附加自定义认证 Token。
+ *       本实现采用现代标准的 {@code fetch()} 配合 {@code ReadableStream}，支持 POST 请求体与 Sa-Token 鉴权 Header。</li>
+ *   <li><b>SSE 协议规范解析：</b>
+ *       <br>SSE 消息块以双换行符 ({@code \n\n}) 分割。每个事件可包含 {@code event: <名称>} 与多行 {@code data: <数据>}。
+ *       解码器必须妥善处理 TCP 分包导致的半截数据暂存缓存（Buffer）。</li>
+ *   <li><b>主动取消机制：</b>
+ *       <br>返回一个标准的 {@link AbortController}，当用户在前端点击“停止生成”按钮时，调用 {@code controller.abort()} 即可瞬间切断 HTTP 连接，停止服务端算力消耗。</li>
+ * </ol>
+ *
+ * @param data      请求载荷（会话 ID、指定智能体、提问文本、挂载知识库 ID 列表）
+ * @param callbacks 各通道流式事件回调字典
+ * @return 控制器句柄 (可随时调用 .abort() 终止请求)
  */
 export const streamChat = (
   data: {
@@ -127,6 +146,7 @@ export const streamChat = (
   }
 ) => {
   const token = localStorage.getItem('token');
+  // 创建可取消控制器
   const controller = new AbortController();
 
   fetch('/api/chat/stream', {

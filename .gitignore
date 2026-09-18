@@ -43,3 +43,4 @@ Thumbs.db
 # 系统与Agent临时文件
 .agent/
 .gemini/
+META-INF/

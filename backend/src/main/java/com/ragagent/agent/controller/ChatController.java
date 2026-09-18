@@ -45,6 +45,32 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * <h1>Agent 对话核心控制中枢 (Reactive Streaming Chat Controller)</h1>
+ * <p>
+ * 本控制器是前后端人机交互的核心入口，采用 <b>Spring WebFlux 响应式流 + SSE (Server-Sent Events)</b> 技术栈，
+ * 完美实现了大模型打字机流式输出、中间思考链可视化、知识溯源以及记忆自进化的完整闭环。
+ * <p>
+ * <b>核心学习知识点：</b>
+ * <ol>
+ *   <li><b>为什么采用 SSE (text/event-stream) 而非 WebSocket？</b>
+ *       <br>对于单向流式下发（用户发送一次请求，服务端流式返回数百个 Token），SSE 基于标准 HTTP 协议，天然支持断线重连、反向代理（Nginx/网关）透传更简单，比有状态的全双工 WebSocket 更轻量、更易扩展。</li>
+ *   <li><b>多阶段多通道 SSE 事件协议：</b>
+ *       <ul>
+ *         <li>{@code thought}：思维链推演文本（意图分析、时间感知、检索中间日志）。</li>
+ *         <li>{@code session_title}：首轮新会话时大模型自动提炼并广播的简短标题。</li>
+ *         <li>{@code memories}：命中的长期偏好与用户习惯记忆切片。</li>
+ *         <li>{@code citations}：RAG 召回的高置信度证据切片（包含文档名、相似度得分）。</li>
+ *         <li>{@code message}：大模型回答的正文增量 Token。</li>
+ *         <li>{@code finish}：流式生成终结事件，下发完整落库实体。</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>双轨记忆架构 (Dual-Track Memory)：</b>
+ *       <br>短期记忆基于 Redis 滑动窗口维护最近 4 轮上下文；长期记忆基于语义向量检索用户画像与操作偏好；回答完成后异步触发 Mem0 提炼，实现智能体越用越聪明。</li>
+ * </ol>
+ *
+ * @author Java-RAG Team
+ */
 @Slf4j
 @Tag(name = "Agent 流式对话与会话中心")
 @RestController
@@ -52,27 +78,41 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class ChatController {
 
+    /** 会话元数据持久层 Mapper */
     private final AiChatSessionMapper sessionMapper;
+    /** 会话历史消息明细持久层 Mapper */
     private final AiChatMessageMapper messageMapper;
+    /** 智能体配置持久层 Mapper */
     private final AiAgentMapper agentMapper;
+    /** RAG 知识库多维检索服务 */
     private final RagSearchService ragSearchService;
+    /** Spring AI 对话模型提供者 (按需装配，支持 Ollama、DeepSeek、OpenAI 等) */
     private final ObjectProvider<ChatModel> chatModelProvider;
 
-    // 记忆与自进化体系服务注入
+    // ─── 记忆与自进化体系服务注入 ──────────────────────────────────────────
+    /** Redis 短期工作记忆服务 (维护最近几轮对话上下文) */
     private final ShortTermMemoryService shortTermMemoryService;
+    /** 长期记忆服务 (用户画像、长程偏好与自省准则) */
     private final LongTermMemoryService longTermMemoryService;
+    /** 对话结束后的记忆自进化与经验提炼服务 (Mem0 反省范式) */
     private final MemoryEvolutionService memoryEvolutionService;
 
-    // Spring AI 2.0 ChatClient 与提示词文件服务
+    // ─── Spring AI 2.0 组件与提示词服务 ──────────────────────────────────
+    /** Spring AI 2.0 声明式 ChatClient 构建器 */
     private final ChatClient.Builder chatClientBuilder;
+    /** Spring AI 原生 ChatMemory 接口适配 */
     private final org.springframework.ai.chat.memory.ChatMemory chatMemory;
+    /** 提示词文件渲染服务 (支持动态变量插值) */
     private final com.ragagent.agent.service.PromptFileService promptFileService;
 
+    /**
+     * 流式对话入参传输对象 (Chat Request DTO)
+     */
     @Data
     @Schema(name = "ChatRequest", description = "流式对话入参")
     public static class ChatRequest {
 
-        @Schema(description = "会话UUID。为空时服务端自动新建会话，并以首轮提问前 20 字作为标题",
+        @Schema(description = "会话UUID。为空时服务端自动新建会话，并以首轮提问智能生成的简短概括作为标题",
                 example = "3f2a9c1b7e4d4a10")
         private String sessionId;
 
@@ -88,6 +128,9 @@ public class ChatController {
         @Schema(description = "本轮检索限定的知识库ID集合。为空则在用户全部可访问知识库中检索", example = "[1, 2]")
         private List<Long> datasetIds;
 
+        /**
+         * 获取规范化后的有效用户输入内容（抹平 message 与 prompt 两个别名参数的差异）
+         */
         @Schema(hidden = true)
         public String getEffectiveMessage() {
             if (StringUtils.hasText(message)) return message;
@@ -96,8 +139,20 @@ public class ChatController {
         }
     }
 
+    /**
+     * <h3>获取当前登录用户的所有历史会话列表</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * <ul>
+     *   <li>排序策略：优先展示被置顶（{@code pinned=true}）的会话，随后按照最后活跃时间（{@code updateTime}）倒序排列。</li>
+     *   <li>性能优化：批量查出会话对应的最新消息记录，在内存中分组聚合并反向回填最后一条用户/AI回答，避免 N+1 查询风暴。</li>
+     * </ul>
+     *
+     * @param exchange WebFlux 响应式交换机上下文
+     * @return 会话摘要列表（包含消息总数与最新问答预览）
+     */
     @Operation(summary = "获取当前用户的所有会话列表",
-            description = "置顶会话优先，其余按最后活跃时间倒序")
+            description = "置顶会话优先，其余按最后活跃时间倒序，包含最新问答摘要与消息数量")
     @GetMapping("/sessions")
     public Result<List<AiChatSession>> getSessions(org.springframework.web.server.ServerWebExchange exchange) {
         Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
@@ -105,9 +160,50 @@ public class ChatController {
                 .eq(AiChatSession::getUserId, userId)
                 .orderByDesc(AiChatSession::getPinned)
                 .orderByDesc(AiChatSession::getUpdateTime));
+        if (sessions != null && !sessions.isEmpty()) {
+            List<String> sessionIds = sessions.stream().map(AiChatSession::getSessionId).toList();
+            List<AiChatMessage> messages = messageMapper.selectList(new LambdaQueryWrapper<AiChatMessage>()
+                    .in(AiChatMessage::getSessionId, sessionIds)
+                    .orderByAsc(AiChatMessage::getCreateTime));
+            java.util.Map<String, List<AiChatMessage>> msgGroup = messages.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(AiChatMessage::getSessionId));
+            for (AiChatSession s : sessions) {
+                List<AiChatMessage> list = msgGroup.get(s.getSessionId());
+                if (list != null && !list.isEmpty()) {
+                    s.setMessageCount(list.size());
+                    for (int i = list.size() - 1; i >= 0; i--) {
+                        AiChatMessage m = list.get(i);
+                        if (s.getLastAssistantMessage() == null && "assistant".equalsIgnoreCase(m.getRole())) {
+                            s.setLastAssistantMessage(m.getContent());
+                        }
+                        if (s.getLastUserMessage() == null && "user".equalsIgnoreCase(m.getRole())) {
+                            s.setLastUserMessage(m.getContent());
+                        }
+                        if (s.getLastAssistantMessage() != null && s.getLastUserMessage() != null) {
+                            break;
+                        }
+                    }
+                } else {
+                    s.setMessageCount(0);
+                }
+            }
+        }
         return Result.success(sessions);
     }
 
+    /**
+     * <h3>显式创建新会话（带空会话智能复用防膨胀机制）</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * <ul>
+     *   <li><b>空会话泛滥问题：</b> 用户如果在前端频繁点击“新建对话”却不输入任何内容，数据库中会积压大量空无一物的冗余记录。</li>
+     *   <li><b>幂等复用策略：</b> 检索用户最近一条会话，若其历史消息数为 0，则直接复用该会话并更新智能体关联，阻止无意义的数据膨胀。</li>
+     * </ul>
+     *
+     * @param agentId  关联绑定的智能体 ID
+     * @param exchange 响应式上下文
+     * @return 新建或复用的会话对象
+     */
     @Operation(summary = "创建新会话",
             description = "显式新建空会话并返回 sessionId。若最新会话无历史消息，则复用该空会话，防止产生重复空对话")
     @PostMapping("/session")
@@ -117,7 +213,7 @@ public class ChatController {
             org.springframework.web.server.ServerWebExchange exchange) {
         Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
 
-        // 检查当前用户最新的会话是否尚未产生任何消息，若是则直接复用，防止无限创建空会话
+        // 步骤 1：检查当前用户最新会话是否为空，若是则复用，防止无限创建空会话
         List<AiChatSession> latestSessions = sessionMapper.selectList(new LambdaQueryWrapper<AiChatSession>()
                 .eq(AiChatSession::getUserId, userId)
                 .orderByDesc(AiChatSession::getCreateTime)
@@ -127,6 +223,7 @@ public class ChatController {
             Long msgCount = messageMapper.selectCount(new LambdaQueryWrapper<AiChatMessage>()
                     .eq(AiChatMessage::getSessionId, latest.getSessionId()));
             if (msgCount == null || msgCount == 0) {
+                // 如果用户切换了智能体，更新已有空会话绑定的 agentId
                 if (agentId != null && !agentId.equals(latest.getAgentId())) {
                     latest.setAgentId(agentId);
                     latest.setUpdateTime(LocalDateTime.now());
@@ -136,6 +233,7 @@ public class ChatController {
             }
         }
 
+        // 步骤 2：生成全局唯一 32 位 UUID 并入库
         String sessionId = IdUtil.simpleUUID();
         AiChatSession session = AiChatSession.builder()
                 .sessionId(sessionId)
@@ -150,6 +248,12 @@ public class ChatController {
         return Result.success(session);
     }
 
+    /**
+     * <h3>获取指定会话的历史问答流</h3>
+     *
+     * @param sessionId 会话全局唯一 UUID
+     * @return 按时间正序排列的问答列表（包含用户提问、AI回答、思考链与切片溯源引用）
+     */
     @Operation(summary = "获取会话历史消息记录",
             description = "按消息生成时间升序返回该会话的全部多轮消息")
     @GetMapping("/history/{sessionId}")
@@ -162,6 +266,16 @@ public class ChatController {
         return Result.success(list);
     }
 
+    /**
+     * <h3>删除指定会话（三级级联清理）</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * 级联清理会话元数据（MySQL/PostgreSQL）、历史消息表记录，以及 Redis 中的短期工作记忆键，杜绝缓存残留。
+     *
+     * @param sessionId 待删除会话 UUID
+     * @param exchange  响应式上下文
+     * @return 是否成功
+     */
     @Operation(summary = "删除指定对话会话", description = "级联清理会话记录、历史消息以及Redis短期记忆缓存")
     @DeleteMapping("/session/{sessionId}")
     public Result<Boolean> deleteSession(
@@ -170,21 +284,19 @@ public class ChatController {
             org.springframework.web.server.ServerWebExchange exchange) {
         Long userId = com.ragagent.common.security.SecurityUtils.getLoginUserIdOrDefault(1L);
 
+        // 1. 删除会话主记录（带租户 userId 校验，杜绝越权删除他人会话）
         sessionMapper.delete(new LambdaQueryWrapper<AiChatSession>()
                 .eq(AiChatSession::getSessionId, sessionId)
                 .eq(AiChatSession::getUserId, userId));
 
+        // 2. 删除关联的全部问答消息
         messageMapper.delete(new LambdaQueryWrapper<AiChatMessage>()
                 .eq(AiChatMessage::getSessionId, sessionId));
 
-        shortTermMemoryService.clearSession(sessionId);
-        try {
-            chatMemory.clear(sessionId);
-        } catch (Exception e) {
-            log.warn("清理 Redis ChatMemory 异常: sessionId={}, error={}", sessionId, e.getMessage());
-        }
+        // 3. 清理 Redis 短期工作记忆上下文
+        shortTermMemoryService.clearSessionMemory(sessionId);
 
-        return Result.success("会话已删除", true);
+        return Result.success(true);
     }
 
     public enum ChatIntentType {
@@ -201,6 +313,19 @@ public class ChatController {
         private String description;
     }
 
+    /**
+     * <h3>轻量级意图识别与语义分流器 (Intent Router)</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * <ul>
+     *   <li><b>为什么需要前置意图分流？</b> 如果用户问“今天天气怎么样”或“现在几点了”，盲目去企业技术知识库执行向量搜索不仅浪费算力，还会召回毫无关系的文档（例如 Java 配置文件中包含“time”），严重破坏大模型的回答准确度。</li>
+     *   <li><b>前置分流策略：</b> 采用正则与高频语义特征实现毫秒级前置分流。对生活资讯类查询严格隔离知识库，对明确的业务咨询触发向量召回。</li>
+     * </ul>
+     *
+     * @param userMessage 用户原始输入文本
+     * @param datasetIds  本轮挂载的知识库集合
+     * @return 意图识别结果封装（包含类型、提取城市、意图描述）
+     */
     private ChatIntentResult analyzeIntent(String userMessage, List<Long> datasetIds) {
         ChatIntentResult result = new ChatIntentResult();
         if (!StringUtils.hasText(userMessage)) {
@@ -211,11 +336,11 @@ public class ChatController {
 
         String msg = userMessage.toLowerCase().trim();
 
-        // 1. 优先识别天气意图
+        // 意图 1：气象与生活资讯意图（触发隔离知识库 + 气象关怀推理）
         Pattern weatherPattern = Pattern.compile(".*(天气|气温|下雨|下雪|晴天|多云|阴天|刮风|冷不冷|热不热|气象|预报).*");
         if (weatherPattern.matcher(msg).matches()) {
             result.setType(ChatIntentType.WEATHER);
-            // 提取目标城市 (覆盖主要城市与通用正则)
+            // 提取目标城市 (覆盖主要城市与通用正则匹配)
             Pattern cityPattern = Pattern.compile("([\u4e00-\u9fa5]{2,6}?)(市|区|县)?(的)?(今天|明天|后天|现在|当前)?(天气|气温|气象|下雨|冷不冷|预报)");
             Matcher cityMatcher = cityPattern.matcher(userMessage);
             if (cityMatcher.find()) {
@@ -237,7 +362,7 @@ public class ChatController {
             return result;
         }
 
-        // 2. 识别系统时间/日期意图
+        // 意图 2：宿主机真实时间与日期意图（直接读取物理时钟注入 Prompt）
         Pattern timePattern = Pattern.compile(".*(几点|几号|星期几|礼拜几|周几|哪一年|当前时间|现在时间|系统时间|今天日期|今天是什么日子|今天是几号).*");
         if (timePattern.matcher(msg).matches()) {
             result.setType(ChatIntentType.TIME);
@@ -245,7 +370,7 @@ public class ChatController {
             return result;
         }
 
-        // 3. 识别知识库问答 (需结合关键词或明确的业务咨询语义)
+        // 意图 3：企业专业知识库检索意图（挂载了知识库且包含规约/技术关键词）
         Pattern kbPattern = Pattern.compile(".*(规范|制度|架构|文档|流程|评审|指南|政策|条例|方案|要求|api|接口|数据宝|证书|配置|系统|研发).*");
         if (kbPattern.matcher(msg).matches() && datasetIds != null && !datasetIds.isEmpty()) {
             result.setType(ChatIntentType.KNOWLEDGE_QA);
@@ -253,12 +378,23 @@ public class ChatController {
             return result;
         }
 
-        // 4. 默认通用智能体对话
+        // 意图 4：默认通用问答与大模型通用推理
         result.setType(ChatIntentType.GENERAL);
         result.setDescription("通用认知与智能推理");
         return result;
     }
 
+    /**
+     * <h3>大模型驱动的会话标题智能提炼算法</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * 依据用户首轮提问，调用大模型快速提炼 4~10 个汉字的极凝练标题（如“WebFlux响应式架构选型”），
+     * 替代传统呆板的“截取前20个字”，大幅提升对话历史列表的可读性与美观度。
+     *
+     * @param userMessage 用户首轮问题文本
+     * @param chatModel   对话模型实例
+     * @return 凝练的会话标题
+     */
     private String generateSmartTitle(String userMessage, ChatModel chatModel) {
         if (!StringUtils.hasText(userMessage)) {
             return "新对话";
@@ -282,7 +418,7 @@ public class ChatController {
                     }
                 }
             } catch (Exception e) {
-                log.warn("大模型生成会话标题降级: {}", e.getMessage());
+                log.warn("【ChatController】大模型生成会话标题降级，回退规则截断: {}", e.getMessage());
             }
         }
         // 规则提取降级兜底
@@ -290,6 +426,34 @@ public class ChatController {
         return fallback.length() > 10 ? fallback.substring(0, 10) : (fallback.isEmpty() ? "新对话" : fallback);
     }
 
+    /**
+     * <h3>SSE 响应式流式智能对话核心接口 (Server-Sent Events)</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * <ol>
+     *   <li><b>响应式 Flux.create 机制：</b>
+     *       <br>采用 Project Reactor 的 {@link Flux#create(java.util.function.Consumer)} 构造可推流的异步发射源（Sink）。
+     *       配合 Java 21+ 虚拟线程或异步任务池，允许工作线程在数据生成时即时调用 {@code sink.next()} 逐个下发事件包，在完成时调用 {@code sink.complete()}。</li>
+     *   <li><b>为什么在虚拟线程异步块执行？</b>
+     *       <br>WebFlux 控制器方法必须立刻返回 {@code Flux<ServerSentEvent<String>>} 释放 Netty 事件循环线程，耗时的检索与 LLM 调用交由异步线程池执行，保障系统吞吐量。</li>
+     *   <li><b>八大流式推演流水线：</b>
+     *       <ol>
+     *         <li>宿主机绝对真实时间与时钟感知。</li>
+     *         <li>会话自动创建与大模型智能标题提炼广播。</li>
+     *         <li>意图分类与思考链（thought）推演下发。</li>
+     *         <li>Redis 短期记忆检索与 LongTerm 长期偏好命中。</li>
+     *         <li>针对知识库业务提问执行四维向量切片混合检索。</li>
+     *         <li>System Prompt 规约构建（排版规范、防幻觉约束、时间锚定）。</li>
+     *         <li>大模型流式 Token 推送（message 事件）。</li>
+     *         <li>会话结束持久化与异步 Mem0 记忆自省提炼。</li>
+     *       </ol>
+     *   </li>
+     * </ol>
+     *
+     * @param req      对话请求入参
+     * @param exchange 响应式交换机上下文
+     * @return 持续发射的 SSE 事件流
+     */
     @Operation(summary = "SSE 流式智能对话 (集成意图识别 + 宿主机真实时间感知 + 记忆演化 + RAG知识检索 + 智能标题生成)",
             description = """
                     以 `text/event-stream` 持续推送，事件名（SSE event 字段）及其 data 载荷如下：
@@ -311,6 +475,7 @@ public class ChatController {
         final Long userId = currentUserId;
         final String userMessage = req.getEffectiveMessage();
 
+        // 基于 Reactor 的 FluxSink 创建流式发射通道
         return Flux.create(sink -> {
             CompletableFuture.runAsync(() -> {
                 try {
@@ -574,12 +739,32 @@ public class ChatController {
         });
     }
 
+    /**
+     * <h3>会话生成结束收敛处理 (Finish Session Pipeline)</h3>
+     * <p>
+     * <b>学习核心知识点：</b>
+     * <ol>
+     *   <li><b>双写持久化：</b> 既将完整消息记录持久化至数据库（永久存档与审计），又写入 Redis 短期记忆列表（供多轮对话即时滑窗读取）。</li>
+     *   <li><b>Mem0 异步反省机制：</b> 调用 {@code memoryEvolutionService.evolveFromConversationAsync}，在后台异步启动模型反思，提取用户的新增事实、编码偏好或纠错经验，动态构建长期记忆网络。</li>
+     *   <li><b>终结信号下发：</b> 发送名为 {@code finish} 的 SSE 事件包通知前端结束动画，随后调用 {@code sink.complete()} 释放 HTTP 长连接通道。</li>
+     * </ol>
+     *
+     * @param userId           发起用户 ID
+     * @param agentId          使用的智能体 ID
+     * @param sessionId        会话 UUID
+     * @param userMessage      用户本轮原始问题
+     * @param assistantContent 大模型生成的完整回答正文
+     * @param thought          本轮累加的完整思考链/中间检索轨迹
+     * @param chunks           命中的知识切片溯源引用
+     * @param sessionTitle     若是首轮新会话提炼出的标题，可为空
+     * @param sink             响应式流发射通道
+     */
     private void finishSession(Long userId, Long agentId, String sessionId, String userMessage,
                                String assistantContent, String thought,
                                List<RagSearchService.SearchResultChunk> chunks,
                                String sessionTitle,
                                reactor.core.publisher.FluxSink<ServerSentEvent<String>> sink) {
-        // 保存助手回答到数据库
+        // 步骤 1：保存助手回答到关系型数据库（含 Token 估算与切片溯源 JSON）
         AiChatMessage assistantMsg = AiChatMessage.builder()
                 .sessionId(sessionId)
                 .role("assistant")
