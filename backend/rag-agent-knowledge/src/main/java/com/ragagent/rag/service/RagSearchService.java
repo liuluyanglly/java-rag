@@ -54,6 +54,8 @@ public class RagSearchService {
     private final AiDocumentChunkMapper chunkMapper;
     /** Spring AI 向量库提供者 (支持动态按需注入) */
     private final ObjectProvider<VectorStore> vectorStoreProvider;
+    /** 标准重排序客户端 (默认装配 BGE HTTP 客户端，具备规则平滑兜底) */
+    private final com.ragagent.rag.rerank.RerankerClient rerankerClient;
 
     /** 是否启用远程向量模型 (可配置关闭以仅使用关系库全文检索) */
     @org.springframework.beans.factory.annotation.Value("${spring.ai.openai.embedding.enabled:true}")
@@ -171,21 +173,34 @@ public class RagSearchService {
                     Long docDatasetId = dsId != null ? Long.valueOf(dsId.toString()) : null;
                     // 应用层二次核验权限隔离，实现零信任架构双保险
                     if (docDatasetId != null && effectiveDatasetIds.contains(docDatasetId)) {
-                        String docText = doc.getText();
-                        // 步骤 3：第二阶段 —— Rerank 精排打分（综合语义与精确匹配）
-                        double baseScore = calculateRelevanceScore(query, docText);
                         candidateList.add(SearchResultChunk.builder()
                                 .datasetId(docDatasetId)
                                 .documentName(String.valueOf(doc.getMetadata().getOrDefault("docName", "未知文档")))
-                                .content(docText)
-                                .score(baseScore)
+                                .content(doc.getText())
+                                .score(0.65)
                                 .build());
                     }
                 }
 
-                // 精排重排 (Rerank)：按复合综合得分进行降序重排，并精准截取前 Top-K 条
-                candidateList.sort((a, b) -> Double.compare(b.getScore(), a.getScore()));
-                results.addAll(candidateList.stream().limit(topK).toList());
+                // 步骤 3：第二阶段 —— 调用标准 RerankerClient 执行精排重排序 (BGE Cross-Encoder / 本地规则兜底)
+                if (!candidateList.isEmpty()) {
+                    List<String> candidateTexts = candidateList.stream()
+                            .map(SearchResultChunk::getContent)
+                            .toList();
+                    List<com.ragagent.rag.rerank.RerankResult> rerankResults = rerankerClient.rerank(query, candidateTexts, topK);
+                    if (rerankResults != null && !rerankResults.isEmpty()) {
+                        for (com.ragagent.rag.rerank.RerankResult rr : rerankResults) {
+                            if (rr.getIndex() >= 0 && rr.getIndex() < candidateList.size()) {
+                                SearchResultChunk matched = candidateList.get(rr.getIndex());
+                                matched.setScore(rr.getScore());
+                                results.add(matched);
+                            }
+                        }
+                    } else {
+                        // 若重排结果未截取，按默认截取
+                        results.addAll(candidateList.stream().limit(topK).toList());
+                    }
+                }
 
             } catch (Exception e) {
                 // 容错降级日志记录

@@ -87,12 +87,12 @@ public class MemoryDecisionEngine {
         try {
             // 阶段 1: 提取候选事实
             String conversation = "用户: " + userMsg + "\n助手: " + (assistantResp != null ? assistantResp : "");
-            String extractJson = ChatClient.create(chatModel)
-                    .prompt()
-                    .system(EXTRACT_PROMPT)
-                    .user(conversation)
-                    .call()
-                    .content();
+            String extractJson = ChatClient.create(chatModel) // 基于 ChatModel 快速创建 ChatClient 实例
+                    .prompt()                                 // 开启 Prompt 构建流
+                    .system(EXTRACT_PROMPT)                   // 注入长期事实与偏好提炼规约提示词
+                    .user(conversation)                       // 传入当前完整对话上下文文本
+                    .call()                                   // 发起同步大模型推理调用
+                    .content();                               // 提取结构化 JSON 候选事实文本
 
             List<MemoryCandidate> candidates = parseCandidates(extractJson);
             if (candidates.isEmpty()) {
@@ -123,12 +123,12 @@ public class MemoryDecisionEngine {
                     }
                 }
 
-                String decisionJson = ChatClient.create(chatModel)
-                        .prompt()
-                        .system(DECIDE_PROMPT)
-                        .user(decideInput.toString())
-                        .call()
-                        .content();
+                String decisionJson = ChatClient.create(chatModel) // 构建仲裁用 ChatClient 实例
+                        .prompt()                                  // 开启 Prompt 请求构建链
+                        .system(DECIDE_PROMPT)                     // 注入 Mem0 状态机冲突消解规约 (ADD/UPDATE/DELETE/NOOP)
+                        .user(decideInput.toString())              // 注入候选记忆与既有相似记忆的对比上下文
+                        .call()                                    // 执行大模型决策推理调用
+                        .content();                                // 提取决策结果 JSON 纯文本
 
                 MemoryDecisionResult result = parseDecision(decisionJson);
                 if (result != null && !"NOOP".equalsIgnoreCase(result.getAction())) {

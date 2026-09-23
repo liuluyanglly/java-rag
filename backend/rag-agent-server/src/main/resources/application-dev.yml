@@ -105,3 +105,14 @@ management:
     tags:
       application: java-rag
 
+# RAG 检索与重排序高级配置
+rag:
+  reranker:
+    enabled: ${RAG_RERANKER_ENABLED:true}
+    type: ${RAG_RERANKER_TYPE:BGE_HTTP} # BGE_HTTP (默认且支持自动熔断降级) / RULE_BASED (纯本地规则)
+    base-url: ${RAG_RERANKER_BASE_URL:http://192.168.100.90:8012}
+    api-key: ${RAG_RERANKER_API_KEY:empty}
+    model: ${RAG_RERANKER_MODEL:BAAI/bge-reranker-large}
+    timeout-ms: 5000
+    min-score: 0.20 # 过滤低置信度噪点切片
+

@@ -227,11 +227,11 @@ public class ChatServiceImpl implements ChatService {
         if (chatModel != null) {
             try {
                 String prompt = "请为以下用户提问生成一个极简短凝练的会话标题，长度在4到10个汉字之间，直接输出标题纯文本，不要带有任何标点符号、书名号、引号或前缀解释：\n" + cleanMsg;
-                String generated = chatClientBuilder.build()
-                        .prompt()
-                        .user(prompt)
-                        .call()
-                        .content();
+                String generated = chatClientBuilder.build() // 构建 ChatClient 客户端实例
+                        .prompt()                            // 开启 Fluent 提示词构建器
+                        .user(prompt)                        // 传入提炼标题的引导提示词
+                        .call()                              // 发起同步大模型推理调用
+                        .content();                          // 提取模型返回的标题正文内容
                 if (StringUtils.hasText(generated)) {
                     String title = generated.replaceAll("[\"“'”《》\\s\\n\\r。，！!？?]", "").trim();
                     if (title.length() > 12) {
@@ -352,7 +352,8 @@ public class ChatServiceImpl implements ChatService {
                     sendThought.accept("🧠 [上下文检索] 正在从 Redis(10号库) 读取会话短期记忆与上下文...\n");
                     Thread.sleep(60);
 
-                    List<AiAgentMemory> memories = longTermMemoryService.searchMemories(userId, userMessage, 3);
+                    List<AiAgentMemory> memories = longTermMemoryService // 长期记忆中枢服务
+                            .searchMemories(userId, userMessage, 3);     // 执行 0.60相关度 + 0.25重要度 + 0.15时间衰减 的斯坦福混合加权检索 (召回 Top3)
                     if (!memories.isEmpty()) {
                         StringBuilder memSb = new StringBuilder("✨ [长期偏好] 命中 " + memories.size() + " 条长期偏好与自进化纠错准则：\n");
                         for (AiAgentMemory m : memories) {
@@ -479,13 +480,13 @@ public class ChatServiceImpl implements ChatService {
                     StringBuilder fullResponse = new StringBuilder();
 
                     if (chatModel != null) {
-                        Flux<String> streamFlux = chatClientBuilder.build()
-                                .prompt()
-                                .system(systemPromptBuilder.toString())
-                                .user(promptWithContext.toString())
-                                .advisors(advisorSpec -> advisorSpec.param(org.springframework.ai.chat.memory.ChatMemory.CONVERSATION_ID, finalSessionId))
-                                .stream()
-                                .content();
+                        Flux<String> streamFlux = chatClientBuilder.build() // 基于 Spring AI 构建 ChatClient 会话客户端实例
+                                .prompt()                                   // 初始化 Fluent 风格的 Prompt 请求链
+                                .system(systemPromptBuilder.toString())     // 注入系统人设、环境时空感知与意图处理规约
+                                .user(promptWithContext.toString())         // 注入包含知识切片与当前问题的用户上下文
+                                .advisors(advisorSpec -> advisorSpec.param(org.springframework.ai.chat.memory.ChatMemory.CONVERSATION_ID, finalSessionId)) // 挂载短期记忆顾问并绑定当前会话标识 (Redis 滑动窗口)
+                                .stream()                                   // 开启响应式流式调用模式 (Reactive SSE)
+                                .content();                                 // 获取大语言模型逐字/逐词推流的响应内容流 (Flux<String>)
 
                         streamFlux.doOnNext(token -> {
                             fullResponse.append(token);
@@ -567,10 +568,10 @@ private void finishSession(Long userId, Long agentId, String sessionId, String u
         messageMapper.insert(assistantMsg);
 
         // 保存助手回答到 Redis 短期记忆
-        shortTermMemoryService.appendMessage(sessionId, "assistant", assistantContent);
+        shortTermMemoryService.appendMessage(sessionId, "assistant", assistantContent); // 追加回复文本至 Redis 10号库短期滑动窗口
 
         // 异步触发 Mem0 事实提炼与自进化闭环
-        memoryEvolutionService.evolveFromConversationAsync(userId, agentId, sessionId, userMessage, assistantContent);
+        memoryEvolutionService.evolveFromConversationAsync(userId, agentId, sessionId, userMessage, assistantContent); // 异步后台启动 Mem0 模型反思，抽取新偏好并持久化至长期记忆库
 
         Map<String, Object> finishPayload = new java.util.HashMap<>();
         finishPayload.put("id", assistantMsg.getId());

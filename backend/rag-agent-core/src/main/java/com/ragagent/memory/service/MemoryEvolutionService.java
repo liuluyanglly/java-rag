@@ -79,12 +79,12 @@ public class MemoryEvolutionService {
                  .append("【Agent 原始回答】: ").append(originalAnswer != null ? originalAnswer : "(无回答)").append("\n")
                  .append("【用户批评与纠错指出】: ").append(userFeedback).append("\n");
 
-            String reflexionJson = ChatClient.create(chatModel)
-                    .prompt()
-                    .system(REFLEXION_SYSTEM_PROMPT)
-                    .user(input.toString())
-                    .call()
-                    .content();
+            String reflexionJson = ChatClient.create(chatModel) // 基于 ChatModel 构建反省专用的 ChatClient 实例
+                    .prompt()                                    // 初始化 Prompt 请求流
+                    .system(REFLEXION_SYSTEM_PROMPT)             // 注入基于 Reflexion 论文框架的自省与错误根因诊断规约
+                    .user(input.toString())                      // 注入用户原问题、助手回答及用户点踩纠错内容
+                    .call()                                      // 同步执行大模型深度反省推理
+                    .content();                                  // 提取模型产出的结构化诊断与改进规约 JSON 文本
 
             ReflexionResult result = parseReflexion(reflexionJson);
             if (result != null) {

@@ -43,6 +43,12 @@ public class GraphState implements Serializable {
         return this.data.get(key);
     }
 
+    @SuppressWarnings("unchecked")
+    public <T> T getOrDefault(String key, T defaultValue) {
+        Object val = this.data.get(key);
+        return val != null ? (T) val : defaultValue;
+    }
+
     public void addThought(String thought) {
         this.thoughts.add(thought);
     }
