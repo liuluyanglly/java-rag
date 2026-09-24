@@ -273,7 +273,7 @@ export const ChatPage: React.FC = () => {
     };
     setMessages((prev) => [...prev, userMsg]);
     setGenerating(true);
-    setCurrentThought('🧠 正在理解提问语义，激活深度思考与意图推理回路...\n');
+    setCurrentThought('');
     setCurrentCitations([]);
     setCurrentMemories([]);
     setStreamingContent('');
@@ -282,7 +282,7 @@ export const ChatPage: React.FC = () => {
 
     let fullRawText = '';
     let fullText = '';
-    let thoughtText = '🧠 正在理解提问语义，激活深度思考与意图推理回路...\n';
+    let thoughtText = '';
     let citationsArr: CitationItem[] = [];
     let memoriesArr: AgentMemoryItem[] = [];
 
@@ -674,8 +674,8 @@ export const ChatPage: React.FC = () => {
                         className="px-3 py-1.5 flex items-center justify-between cursor-pointer text-slate-700 hover:text-slate-950 select-none font-semibold transition-colors"
                       >
                         <span className="flex items-center gap-1.5">
-                          <BulbOutlined className="text-amber-500" />
-                          <span>已深度思考 (包含检索轨迹与记忆调用)</span>
+                          <BulbOutlined className="text-indigo-500" />
+                          <span>已完成多智能体协同思考与四维检索轨迹</span>
                         </span>
                         <div className="flex items-center gap-1 text-[11px] text-slate-400 font-normal">
                           <span>{isThoughtOpen ? '收起' : '展开'}</span>
@@ -778,11 +778,11 @@ export const ChatPage: React.FC = () => {
                   <div className="w-full rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/60 via-slate-50 to-white text-xs p-3 font-mono text-slate-700 shadow-2xs mb-1">
                     <div className="flex items-center justify-between font-semibold mb-1.5 text-indigo-950">
                       <span className="flex items-center gap-1.5">
-                        <Spin size="small" /> <span>🧠 深度思考与知识检索轨迹</span>
+                        <Spin size="small" /> <span>🧠 多智能体协同思考与四维检索推导</span>
                       </span>
-                      <span className="text-[10px] text-indigo-600 font-normal">实时执行中...</span>
+                      <span className="text-[10px] text-indigo-600 font-normal">多智能体实时协作中...</span>
                     </div>
-                    <div className="whitespace-pre-wrap text-[11px] leading-relaxed text-slate-700 bg-white/80 p-2.5 rounded-lg border border-indigo-100/60">
+                    <div className="whitespace-pre-wrap text-[11px] leading-relaxed text-slate-700 bg-white/90 p-2.5 rounded-lg border border-indigo-100/60 max-h-72 overflow-y-auto">
                       {currentThought}
                     </div>
                   </div>

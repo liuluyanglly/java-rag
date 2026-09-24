@@ -16,6 +16,8 @@ import com.ragagent.memory.entity.AiAgentMemory;
 import com.ragagent.memory.service.LongTermMemoryService;
 import com.ragagent.memory.service.MemoryEvolutionService;
 import com.ragagent.memory.service.ShortTermMemoryService;
+import com.ragagent.agent.service.AgentThoughtStreamer;
+import com.ragagent.rag.service.HybridSearchEngine;
 import com.ragagent.rag.service.RagSearchService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +52,8 @@ public class ChatServiceImpl implements ChatService {
     private final AiChatMessageMapper messageMapper;
     private final AiAgentMapper agentMapper;
     private final RagSearchService ragSearchService;
+    private final HybridSearchEngine hybridSearchEngine;
+    private final AgentThoughtStreamer agentThoughtStreamer;
     private final ObjectProvider<ChatModel> chatModelProvider;
     private final ShortTermMemoryService shortTermMemoryService;
     private final LongTermMemoryService longTermMemoryService;
@@ -330,69 +334,61 @@ public class ChatServiceImpl implements ChatService {
                                 .build());
                     };
 
-                    // 3. 推送思考链 - 阶段一：意图识别与环境时间感知
+                    // 3. 多智能体协作 - 阶段一：任务规划总控智能体 (Planner Agent)
+                    boolean hasDataset = (req.getDatasetIds() != null && !req.getDatasetIds().isEmpty());
+                    agentThoughtStreamer.streamPlanningStep(sink, fullThought, userMessage, hasDataset);
+
+                    // 4. 多智能体协作 - 阶段二：意图与时空感知智能体 (Context Agent)
                     ChatIntentResult intent = analyzeIntent(userMessage, req.getDatasetIds());
+                    String intentDesc;
                     if (intent.getType() == ChatIntentType.WEATHER) {
                         String cityDisplay = StringUtils.hasText(intent.getCity()) ? intent.getCity() : "未指定城市(智能建议)";
-                        sendThought.accept(String.format("🎯 [意图识别] 识别用户意图: 【生活资讯 - 天气查询】 (基准系统时间: %s %s | 目标城市: %s)\n",
-                                currentDateTimeStr, dayOfWeekStr, cityDisplay));
+                        intentDesc = "【生活资讯 - 天气查询】(目标城市: " + cityDisplay + ")";
                     } else if (intent.getType() == ChatIntentType.TIME) {
-                        sendThought.accept(String.format("🎯 [意图识别] 识别用户意图: 【系统时间与日期查询】 (宿主机实时系统时间: %s %s)\n",
-                                currentDateTimeStr, dayOfWeekStr));
+                        intentDesc = "【宿主机绝对时间与日期查询】";
                     } else if (intent.getType() == ChatIntentType.KNOWLEDGE_QA) {
-                        sendThought.accept(String.format("🎯 [意图识别] 识别用户意图: 【企业知识库业务问答】 (系统参考时间: %s)\n",
-                                currentDateTimeStr));
+                        intentDesc = "【企业知识库业务问答】";
                     } else {
-                        sendThought.accept(String.format("🎯 [意图识别] 识别用户意图: 【通用认知与智能推理】 (系统参考时间: %s %s)\n",
-                                currentDateTimeStr, dayOfWeekStr));
+                        intentDesc = "【通用认知与智能推理】";
                     }
-                    Thread.sleep(60);
 
-                    // 4. 推送思考链 - 阶段二：短期记忆与长期偏好检索
-                    sendThought.accept("🧠 [上下文检索] 正在从 Redis(10号库) 读取会话短期记忆与上下文...\n");
-                    Thread.sleep(60);
-
-                    List<AiAgentMemory> memories = longTermMemoryService // 长期记忆中枢服务
-                            .searchMemories(userId, userMessage, 3);     // 执行 0.60相关度 + 0.25重要度 + 0.15时间衰减 的斯坦福混合加权检索 (召回 Top3)
+                    List<AiAgentMemory> memories = longTermMemoryService.searchMemories(userId, userMessage, 3);
                     if (!memories.isEmpty()) {
-                        StringBuilder memSb = new StringBuilder("✨ [长期偏好] 命中 " + memories.size() + " 条长期偏好与自进化纠错准则：\n");
-                        for (AiAgentMemory m : memories) {
-                            memSb.append("   • [").append(m.getMemoryType()).append("] ").append(m.getContent()).append("\n");
-                        }
-                        sendThought.accept(memSb.toString());
                         sink.next(ServerSentEvent.<String>builder().event("memories").data(JSONUtil.toJsonStr(memories)).build());
                     }
+                    agentThoughtStreamer.streamContextStep(sink, fullThought, intentDesc, currentDateTimeStr, dayOfWeekStr, memories);
 
-                    // 5. 推送思考链 - 阶段三：分流式 RAG 知识检索
+                    // 5. 多智能体协作 - 阶段三：四维多路召回智能体 (Hybrid Retrieval Agent)
                     final List<RagSearchService.SearchResultChunk> chunks;
-                    // 只有明确属于企业知识库业务问答时，才执行知识库向量检索；天气、时间与通用问题严格隔离，杜绝无关切片污染回答
-                    if (intent.getType() == ChatIntentType.KNOWLEDGE_QA) {
-                        sendThought.accept("🔍 [知识库检索] 正在检索知识库元数据并比对向量相似度...\n");
+                    final List<HybridSearchEngine.HybridEvidence> evidences;
+                    if (intent.getType() == ChatIntentType.KNOWLEDGE_QA || hasDataset) {
+                        // 启动四维多路召回流水线 (Dense向量 + Sparse关键词 + GraphRAG知识图谱拓扑 + RRF倒数排名融合)
+                        evidences = hybridSearchEngine.search(userMessage, req.getDatasetIds(), 4);
+                        // 同步获取切片明细用于前端 citations 溯源卡片交互
                         chunks = ragSearchService.search(userId, userMessage, req.getDatasetIds(), 3);
                         if (!chunks.isEmpty()) {
                             sink.next(ServerSentEvent.<String>builder().event("citations").data(JSONUtil.toJsonStr(chunks)).build());
-                            StringBuilder chunkSb = new StringBuilder("📚 [切片命中] 成功召回 " + chunks.size() + " 个高相关度知识切片：\n");
-                            for (int i = 0; i < chunks.size(); i++) {
-                                RagSearchService.SearchResultChunk c = chunks.get(i);
-                                double scorePct = c.getScore() != null ? c.getScore() * 100 : 90.0;
-                                chunkSb.append(String.format("   • 来源: 《%s》 (相似度: %.1f%%)\n", c.getDocumentName(), scorePct));
-                            }
-                            chunkSb.append("💡 [智能推理] 知识库切片已注入 Prompt 上下文，大模型开始组织回答...\n");
-                            sendThought.accept(chunkSb.toString());
-                        } else {
-                            sendThought.accept("💡 [通用推理] 知识库无直接精确命中，准备调用通用大模型智能推理逻辑...\n");
                         }
+                        agentThoughtStreamer.streamHybridRetrievalStep(sink, fullThought, evidences, chunks);
                     } else {
                         chunks = new ArrayList<>();
-                        if (intent.getType() == ChatIntentType.WEATHER) {
-                            sendThought.accept("💡 [意图分流] 命中生活资讯(天气)意图，已安全隔离企业知识库，启动气象与出行关怀逻辑...\n");
-                        } else if (intent.getType() == ChatIntentType.TIME) {
-                            sendThought.accept("💡 [意图分流] 命中系统时间意图，已安全隔离企业知识库，直接读取宿主机精准时钟...\n");
-                        } else {
-                            sendThought.accept("💡 [意图分流] 命中通用问答/编程意图，已安全隔离企业知识库，由大模型结合当前系统环境深度推理...\n");
-                        }
+                        evidences = Collections.emptyList();
+                        agentThoughtStreamer.streamHybridRetrievalStep(sink, fullThought, evidences, chunks);
                     }
-                    Thread.sleep(60);
+
+                    // 6. 多智能体协作 - 阶段四：审查反省质检智能体 (Critic Agent)
+                    boolean hasEvidence = !chunks.isEmpty() || !evidences.isEmpty();
+                    String guidance;
+                    if (intent.getType() == ChatIntentType.WEATHER) {
+                        guidance = "生活资讯意图，已安全隔离企业知识库，启动气象与出行关怀逻辑";
+                    } else if (intent.getType() == ChatIntentType.TIME) {
+                        guidance = "系统时间意图，已安全隔离企业知识库，直接读取宿主机精准时钟";
+                    } else if (hasEvidence) {
+                        guidance = "知识库与图谱证据链充分，按 GFM 美学排版规范组织结构化专业回答";
+                    } else {
+                        guidance = "知识库无直接精确命中，启动通用大模型认知推理并执行防幻觉防御";
+                    }
+                    agentThoughtStreamer.streamCriticStep(sink, fullThought, hasEvidence, guidance);
 
                     // 6. 拼装 System Prompt (动态注入当前绝对系统时间与意图规约)
                     AiAgent agent = req.getAgentId() != null ? agentMapper.selectById(req.getAgentId()) : null;
@@ -458,14 +454,23 @@ public class ChatServiceImpl implements ChatService {
                         promptWithContext.append(shortTermContext).append("\n");
                     }
 
-                    if (!chunks.isEmpty()) {
-                        promptWithContext.append("【参考知识库内容】:\n");
+                    boolean hasRecallEvidence = (!chunks.isEmpty() || !evidences.isEmpty());
+                    if (hasRecallEvidence) {
+                        promptWithContext.append("【参考企业知识库与知识图谱拓扑证据】:\n");
+                        // 注入知识图谱三元组拓扑关系
+                        for (HybridSearchEngine.HybridEvidence ev : evidences) {
+                            if ("KNOWLEDGE_GRAPH".equalsIgnoreCase(ev.getSource())) {
+                                promptWithContext.append("--- [知识图谱拓扑关联] ---\n")
+                                        .append(ev.getSnippet()).append("\n\n");
+                            }
+                        }
+                        // 注入切片内容
                         for (int i = 0; i < chunks.size(); i++) {
                             promptWithContext.append("--- [切片 ").append(i + 1).append("] 来源文档: 《").append(chunks.get(i).getDocumentName()).append("》 ---\n")
                                     .append(chunks.get(i).getContent()).append("\n\n");
                         }
                         promptWithContext.append("【当前用户问题】:\n").append(userMessage)
-                                .append("\n\n(请严格基于上述参考切片，按照【回答格式与美学排版规范】输出优雅美观、结构清晰的回答)");
+                                .append("\n\n(请严格基于上述参考切片与知识图谱关系，按照【回答格式与美学排版规范】输出优雅美观、结构清晰的回答)");
                     } else if (intent.getType() == ChatIntentType.KNOWLEDGE_QA) {
                         promptWithContext.append("【企业知识库防幻觉规约】:\n")
                                 .append("当前企业知识库中未检索到与用户提问直接匹配的文档切片。\n")
